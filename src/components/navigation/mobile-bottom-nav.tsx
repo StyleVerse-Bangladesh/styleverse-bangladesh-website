@@ -27,6 +27,12 @@ export function MobileBottomNav() {
   const cartDrawerOpen = useUiStore((state) => state.isMobileCartDrawerOpen);
   const setAuthModalOpen = useUiStore((state) => state.setMobileAuthModalOpen);
   const authModalOpen = useUiStore((state) => state.isMobileAuthModalOpen);
+  const searchDropdownOpen = useUiStore(
+    (state) => state.isMobileSearchDropdownOpen,
+  );
+  const setSearchDropdownOpen = useUiStore(
+    (state) => state.setMobileSearchDropdownOpen,
+  );
   const categoryActive =
     categoryDrawerOpen ||
     mainNavigation.some(
@@ -58,13 +64,20 @@ export function MobileBottomNav() {
           <span>Category</span>
         </button>
 
-        <MobileBottomLink
-          href="/products"
-          label="Search"
-          active={pathname === "/products"}
+        <button
+          type="button"
+          className={cn(
+            navItemClassName,
+            searchDropdownOpen && "text-black",
+          )}
+          onClick={() => setSearchDropdownOpen(true)}
+          aria-label="Open product search"
+          aria-expanded={searchDropdownOpen}
+          aria-controls="mobile-search-dropdown"
         >
           <Search className="h-5 w-5" />
-        </MobileBottomLink>
+          <span>Search</span>
+        </button>
 
         <button
           type="button"

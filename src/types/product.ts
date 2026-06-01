@@ -3,11 +3,26 @@ export type ProductColor = {
   value: string;
 };
 
+export type InventoryStatus =
+  | "in_stock"
+  | "low_stock"
+  | "out_of_stock"
+  | "pre_order";
+
+export type ProductVariantPreorder = {
+  enabled: boolean;
+  shipsAt?: string;
+  limit?: number;
+};
+
 export type ProductVariant = {
   id: string;
   size: string;
   color: string;
   stock: number;
+  status?: InventoryStatus;
+  lowStockThreshold?: number;
+  preorder?: ProductVariantPreorder;
 };
 
 export type Product = {
@@ -26,6 +41,8 @@ export type Product = {
     | "shoes"
     | "accessories"
     | "seasonal-fits";
+  primaryCategoryId?: string;
+  categoryIds?: string[];
   categoryPath?: string[];
   gender: "men" | "women" | "kids" | "unisex";
   price: number;

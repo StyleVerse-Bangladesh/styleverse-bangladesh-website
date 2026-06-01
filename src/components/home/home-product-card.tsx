@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Check, Heart } from "lucide-react";
+import { getProductAvailability } from "@/lib/inventory";
 import { cn } from "@/lib/utils";
 import { useFlyToCartAnimation } from "@/hooks/use-fly-to-cart-animation";
 import { useCartStore } from "@/store/cart-store";
@@ -63,12 +64,13 @@ export function HomeProductCard({
   const rating = product.rating ?? 0;
   const reviewCount = product.reviewCount ?? 0;
   const wishlistProductId = product.wishlistId ?? product.id;
-  const firstAvailableVariant = cartProduct?.variants.find(
-    (variant) => variant.stock > 0,
-  );
+  const productAvailability = cartProduct
+    ? getProductAvailability(cartProduct)
+    : undefined;
+  const firstAvailableVariant = productAvailability?.variant;
   const canAddToCart =
     Boolean(cartProduct) &&
-    (!cartProduct?.variants.length || Boolean(firstAvailableVariant));
+    Boolean(productAvailability?.purchasable);
   const [showAddedState, setShowAddedState] = useState(false);
   const addedStateTimerRef = useRef<number | null>(null);
   const isWishlisted = useWishlistStore((state) =>
@@ -180,7 +182,7 @@ export function HomeProductCard({
                 Added
               </span>
             ) : (
-              "Add To Cart"
+              (productAvailability?.buttonLabel ?? "Out of Stock")
             )}
           </button>
         </div>

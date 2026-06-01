@@ -8,6 +8,7 @@
     "subcategory": "Formal Shirt",
     "subcategorySlug": "formal-shirt",
     "department": "men",
+    "primaryCategoryId": "cat-men-shirts-formal-shirt",
     "categoryPath": ["men", "shirts", "formal-shirt"],
     "gender": "men",
     "price": 3290,
@@ -23,7 +24,14 @@
     ],
     "sizes": ["S", "M", "L", "XL"],
     "variants": [
-      { "id": "svb-001-white-m", "size": "M", "color": "White", "stock": 12 },
+      {
+        "id": "svb-001-white-m",
+        "size": "M",
+        "color": "White",
+        "stock": 3,
+        "status": "low_stock",
+        "lowStockThreshold": 5
+      },
       { "id": "svb-001-black-l", "size": "L", "color": "Black", "stock": 8 }
     ],
     "isDiscounted": true
@@ -35,6 +43,7 @@
     "category": "Dresses",
     "categorySlug": "dresses",
     "department": "women",
+    "primaryCategoryId": "cat-women-dresses",
     "categoryPath": ["women", "dresses"],
     "gender": "women",
     "price": 5490,
@@ -49,8 +58,20 @@
     ],
     "sizes": ["XS", "S", "M", "L"],
     "variants": [
-      { "id": "svb-002-olive-s", "size": "S", "color": "Olive", "stock": 10 },
-      { "id": "svb-002-sand-m", "size": "M", "color": "Sand", "stock": 6 }
+      {
+        "id": "svb-002-olive-s",
+        "size": "S",
+        "color": "Olive",
+        "stock": 0,
+        "status": "out_of_stock"
+      },
+      {
+        "id": "svb-002-sand-m",
+        "size": "M",
+        "color": "Sand",
+        "stock": 0,
+        "status": "out_of_stock"
+      }
     ],
     "isNew": true
   },
@@ -61,6 +82,7 @@
     "category": "Hoodies",
     "categorySlug": "hoodies",
     "department": "kids",
+    "primaryCategoryId": "cat-kids-hoodies",
     "categoryPath": ["kids", "hoodies"],
     "gender": "kids",
     "price": 2490,
@@ -83,6 +105,7 @@
     "category": "Sneakers",
     "categorySlug": "sneakers",
     "department": "shoes",
+    "primaryCategoryId": "cat-shoes-sneakers",
     "categoryPath": ["shoes", "sneakers"],
     "gender": "unisex",
     "price": 6990,
@@ -109,6 +132,7 @@
     "subcategory": "Half Sleeve T-Shirt",
     "subcategorySlug": "half-sleeve-t-shirt",
     "department": "men",
+    "primaryCategoryId": "cat-men-t-shirts-half-sleeve-t-shirt",
     "categoryPath": ["men", "t-shirts", "half-sleeve-t-shirt"],
     "gender": "men",
     "price": 1190,
@@ -137,6 +161,7 @@
     "subcategory": "Knitted Polo",
     "subcategorySlug": "knitted-polo",
     "department": "men",
+    "primaryCategoryId": "cat-men-polo-t-shirts-knitted-polo",
     "categoryPath": ["men", "polo-t-shirts", "knitted-polo"],
     "gender": "men",
     "price": 1890,
@@ -151,8 +176,25 @@
     ],
     "sizes": ["S", "M", "L", "XL"],
     "variants": [
-      { "id": "svb-006-black-m", "size": "M", "color": "Black", "stock": 9 },
-      { "id": "svb-006-cream-l", "size": "L", "color": "Cream", "stock": 7 }
+      {
+        "id": "svb-006-black-m",
+        "size": "M",
+        "color": "Black",
+        "stock": 0,
+        "status": "pre_order",
+        "preorder": {
+          "enabled": true,
+          "shipsAt": "2026-07-15",
+          "limit": 5
+        }
+      },
+      {
+        "id": "svb-006-cream-l",
+        "size": "L",
+        "color": "Cream",
+        "stock": 0,
+        "status": "out_of_stock"
+      }
     ]
   },
   {
@@ -164,6 +206,7 @@
     "subcategory": "Casual Shirt",
     "subcategorySlug": "casual-shirt",
     "department": "men",
+    "primaryCategoryId": "cat-men-shirts-casual-shirt",
     "categoryPath": ["men", "shirts", "casual-shirt"],
     "gender": "men",
     "price": 2290,
@@ -188,6 +231,7 @@
     "subcategory": "Solid Polo",
     "subcategorySlug": "solid-polo",
     "department": "men",
+    "primaryCategoryId": "cat-men-polo-t-shirts-solid-polo",
     "categoryPath": ["men", "polo-t-shirts", "solid-polo"],
     "gender": "men",
     "price": 1590,

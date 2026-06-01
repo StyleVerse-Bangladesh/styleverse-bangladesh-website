@@ -4,6 +4,7 @@ import { MobileCartDrawer } from "@/components/cart/mobile-cart-drawer";
 import { Header } from "@/components/navigation/header";
 import { MobileBottomNav } from "@/components/navigation/mobile-bottom-nav";
 import { MobileCategoryDrawer } from "@/components/navigation/mobile-category-drawer";
+import { MobileSearchDropdown } from "@/components/search/mobile-search-dropdown";
 import { MobileWishlistDrawer } from "@/components/wishlist/mobile-wishlist-drawer";
 
 type SiteShellProps = {
@@ -20,6 +21,7 @@ export function SiteShell({ children }: SiteShellProps) {
       <MobileCartDrawer />
       <MobileWishlistDrawer />
       <MobileAuthModal />
+      <MobileSearchDropdown />
       <MobileBottomNav />
     </div>
   );

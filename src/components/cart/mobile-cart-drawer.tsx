@@ -16,6 +16,7 @@ import {
   defaultImagePlaceholders,
   getImageUrl,
 } from "@/lib/constants/assets";
+import { getVariantAvailability } from "@/lib/inventory";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/store/cart-store";
 import { useUiStore } from "@/store/ui-store";
@@ -120,6 +121,9 @@ function MobileCartLineItem({
   const selectedVariant = item.product.variants.find(
     (variant) => variant.id === item.variantId,
   );
+  const selectedAvailability = selectedVariant
+    ? getVariantAvailability(selectedVariant)
+    : undefined;
   const imageSrc = getImageUrl(
     item.product.images[0],
     defaultImagePlaceholders.product,
@@ -163,6 +167,11 @@ function MobileCartLineItem({
                 )
               }
             />
+            {selectedAvailability?.isPreorder ? (
+              <p className="mt-2 inline-flex rounded bg-zinc-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-700">
+                {selectedAvailability.label}
+              </p>
+            ) : null}
           </div>
 
           <Button
@@ -250,7 +259,8 @@ function ProductVariantEditor({
 }) {
   const variants = item.product.variants;
   const displayVariant =
-    selectedVariant ?? variants.find((variant) => variant.stock > 0);
+    selectedVariant ??
+    variants.find((variant) => getVariantAvailability(variant).purchasable);
   const [selectedSize, setSelectedSize] = useState(displayVariant?.size);
   const [selectedColor, setSelectedColor] = useState(displayVariant?.color);
 
@@ -277,7 +287,7 @@ function ProductVariantEditor({
       return;
     }
 
-    const nextVariant = findExactInStockVariant(variants, size, selectedColor);
+    const nextVariant = findExactPurchasableVariant(variants, size, selectedColor);
 
     if (nextVariant) {
       setSelectedSize(size);
@@ -290,7 +300,7 @@ function ProductVariantEditor({
       return;
     }
 
-    const nextVariant = findExactInStockVariant(variants, selectedSize, color);
+    const nextVariant = findExactPurchasableVariant(variants, selectedSize, color);
 
     if (nextVariant) {
       setSelectedColor(color);
@@ -309,7 +319,7 @@ function ProductVariantEditor({
             const isSelected = selectedSize === size;
             const disabled =
               !selectedColor ||
-              !findExactInStockVariant(variants, size, selectedColor);
+              !findExactPurchasableVariant(variants, size, selectedColor);
 
             return (
               <button
@@ -349,7 +359,7 @@ function ProductVariantEditor({
             const isSelected = selectedColor === color;
             const disabled =
               !selectedSize ||
-              !findExactInStockVariant(variants, selectedSize, color);
+              !findExactPurchasableVariant(variants, selectedSize, color);
             const swatchColor = item.product.colors.find(
               (productColor) => productColor.name === color,
             )?.value;
@@ -398,7 +408,7 @@ function getUniqueValues(values: string[]) {
   return Array.from(new Set(values));
 }
 
-function findExactInStockVariant(
+function findExactPurchasableVariant(
   variants: ProductVariant[],
   size: string,
   color: string,
@@ -407,7 +417,7 @@ function findExactInStockVariant(
     (variant) =>
       variant.size === size &&
       variant.color === color &&
-      variant.stock > 0,
+      getVariantAvailability(variant).purchasable,
   );
 }
 
