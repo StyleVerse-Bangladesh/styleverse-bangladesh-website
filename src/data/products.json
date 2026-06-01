@@ -1,0 +1,207 @@
+[
+  {
+    "id": "svb-001",
+    "slug": "structured-cotton-shirt",
+    "name": "Structured Cotton Shirt",
+    "category": "Shirts",
+    "categorySlug": "shirts",
+    "subcategory": "Formal Shirt",
+    "subcategorySlug": "formal-shirt",
+    "department": "men",
+    "categoryPath": ["men", "shirts", "formal-shirt"],
+    "gender": "men",
+    "price": 3290,
+    "compareAtPrice": 3990,
+    "currency": "BDT",
+    "images": [
+      "/images/products/structured-cotton-shirt-white.webp",
+      "/images/products/structured-cotton-shirt-black.webp"
+    ],
+    "colors": [
+      { "name": "White", "value": "#ffffff" },
+      { "name": "Black", "value": "#111111" }
+    ],
+    "sizes": ["S", "M", "L", "XL"],
+    "variants": [
+      { "id": "svb-001-white-m", "size": "M", "color": "White", "stock": 12 },
+      { "id": "svb-001-black-l", "size": "L", "color": "Black", "stock": 8 }
+    ],
+    "isDiscounted": true
+  },
+  {
+    "id": "svb-002",
+    "slug": "relaxed-linen-dress",
+    "name": "Relaxed Linen Dress",
+    "category": "Dresses",
+    "categorySlug": "dresses",
+    "department": "women",
+    "categoryPath": ["women", "dresses"],
+    "gender": "women",
+    "price": 5490,
+    "currency": "BDT",
+    "images": [
+      "/images/products/relaxed-linen-dress-olive.webp",
+      "/images/products/relaxed-linen-dress-sand.webp"
+    ],
+    "colors": [
+      { "name": "Olive", "value": "#6f7352" },
+      { "name": "Sand", "value": "#d7c9ad" }
+    ],
+    "sizes": ["XS", "S", "M", "L"],
+    "variants": [
+      { "id": "svb-002-olive-s", "size": "S", "color": "Olive", "stock": 10 },
+      { "id": "svb-002-sand-m", "size": "M", "color": "Sand", "stock": 6 }
+    ],
+    "isNew": true
+  },
+  {
+    "id": "svb-003",
+    "slug": "kids-everyday-hoodie",
+    "name": "Kids Everyday Hoodie",
+    "category": "Hoodies",
+    "categorySlug": "hoodies",
+    "department": "kids",
+    "categoryPath": ["kids", "hoodies"],
+    "gender": "kids",
+    "price": 2490,
+    "currency": "BDT",
+    "images": ["/images/products/kids-everyday-hoodie-navy.webp"],
+    "colors": [
+      { "name": "Navy", "value": "#1f2a44" },
+      { "name": "Red", "value": "#a83232" }
+    ],
+    "sizes": ["4Y", "6Y", "8Y", "10Y"],
+    "variants": [
+      { "id": "svb-003-navy-6y", "size": "6Y", "color": "Navy", "stock": 14 },
+      { "id": "svb-003-red-8y", "size": "8Y", "color": "Red", "stock": 9 }
+    ]
+  },
+  {
+    "id": "svb-004",
+    "slug": "performance-knit-sneaker",
+    "name": "Performance Knit Sneaker",
+    "category": "Sneakers",
+    "categorySlug": "sneakers",
+    "department": "shoes",
+    "categoryPath": ["shoes", "sneakers"],
+    "gender": "unisex",
+    "price": 6990,
+    "compareAtPrice": 7990,
+    "currency": "BDT",
+    "images": ["/images/products/performance-knit-sneaker-graphite.webp"],
+    "colors": [
+      { "name": "Graphite", "value": "#444444" },
+      { "name": "Bone", "value": "#e8e2d8" }
+    ],
+    "sizes": ["39", "40", "41", "42", "43"],
+    "variants": [
+      { "id": "svb-004-graphite-42", "size": "42", "color": "Graphite", "stock": 11 },
+      { "id": "svb-004-bone-41", "size": "41", "color": "Bone", "stock": 5 }
+    ],
+    "isDiscounted": true
+  },
+  {
+    "id": "svb-005",
+    "slug": "half-sleeve-printed-casual-shirt",
+    "name": "Half Sleeve Printed Casual Shirt",
+    "category": "T-Shirts",
+    "categorySlug": "t-shirts",
+    "subcategory": "Half Sleeve T-Shirt",
+    "subcategorySlug": "half-sleeve-t-shirt",
+    "department": "men",
+    "categoryPath": ["men", "t-shirts", "half-sleeve-t-shirt"],
+    "gender": "men",
+    "price": 1190,
+    "currency": "BDT",
+    "images": [
+      "/images/products/half-sleeve-printed-casual-shirt-white.webp",
+      "/images/products/half-sleeve-printed-casual-shirt-black.webp"
+    ],
+    "colors": [
+      { "name": "White", "value": "#ffffff" },
+      { "name": "Black", "value": "#111111" }
+    ],
+    "sizes": ["S", "M", "L", "XL", "XXL"],
+    "variants": [
+      { "id": "svb-005-white-m", "size": "M", "color": "White", "stock": 18 },
+      { "id": "svb-005-black-l", "size": "L", "color": "Black", "stock": 14 }
+    ],
+    "isNew": true
+  },
+  {
+    "id": "svb-006",
+    "slug": "premium-knitted-polo-shirt",
+    "name": "Premium Knitted Polo Shirt",
+    "category": "Polo T-Shirts",
+    "categorySlug": "polo-t-shirts",
+    "subcategory": "Knitted Polo",
+    "subcategorySlug": "knitted-polo",
+    "department": "men",
+    "categoryPath": ["men", "polo-t-shirts", "knitted-polo"],
+    "gender": "men",
+    "price": 1890,
+    "currency": "BDT",
+    "images": [
+      "/images/products/premium-knitted-polo-shirt-black.webp",
+      "/images/products/premium-knitted-polo-shirt-cream.webp"
+    ],
+    "colors": [
+      { "name": "Black", "value": "#111111" },
+      { "name": "Cream", "value": "#f1e7d0" }
+    ],
+    "sizes": ["S", "M", "L", "XL"],
+    "variants": [
+      { "id": "svb-006-black-m", "size": "M", "color": "Black", "stock": 9 },
+      { "id": "svb-006-cream-l", "size": "L", "color": "Cream", "stock": 7 }
+    ]
+  },
+  {
+    "id": "svb-007",
+    "slug": "relaxed-everyday-fashion-shirt",
+    "name": "Relaxed Everyday Fashion Shirt",
+    "category": "Shirts",
+    "categorySlug": "shirts",
+    "subcategory": "Casual Shirt",
+    "subcategorySlug": "casual-shirt",
+    "department": "men",
+    "categoryPath": ["men", "shirts", "casual-shirt"],
+    "gender": "men",
+    "price": 2290,
+    "currency": "BDT",
+    "images": ["/images/products/relaxed-everyday-fashion-shirt-sand.webp"],
+    "colors": [
+      { "name": "Sand", "value": "#d7c9ad" },
+      { "name": "White", "value": "#ffffff" }
+    ],
+    "sizes": ["M", "L", "XL", "XXL"],
+    "variants": [
+      { "id": "svb-007-sand-m", "size": "M", "color": "Sand", "stock": 11 },
+      { "id": "svb-007-white-xl", "size": "XL", "color": "White", "stock": 6 }
+    ]
+  },
+  {
+    "id": "svb-008",
+    "slug": "premium-knit-casual-polo",
+    "name": "Premium Knit Casual Polo",
+    "category": "Polo T-Shirts",
+    "categorySlug": "polo-t-shirts",
+    "subcategory": "Solid Polo",
+    "subcategorySlug": "solid-polo",
+    "department": "men",
+    "categoryPath": ["men", "polo-t-shirts", "solid-polo"],
+    "gender": "men",
+    "price": 1590,
+    "currency": "BDT",
+    "images": ["/images/products/premium-knit-casual-polo-olive.webp"],
+    "colors": [
+      { "name": "Olive", "value": "#6f7352" },
+      { "name": "Black", "value": "#111111" }
+    ],
+    "sizes": ["S", "M", "L", "XL"],
+    "variants": [
+      { "id": "svb-008-olive-m", "size": "M", "color": "Olive", "stock": 13 },
+      { "id": "svb-008-black-l", "size": "L", "color": "Black", "stock": 5 }
+    ],
+    "isNew": true
+  }
+]
