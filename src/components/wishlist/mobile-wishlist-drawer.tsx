@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Price } from "@/components/product/price";
 import { products } from "@/data/catalog";
 import { useFlyToCartAnimation } from "@/hooks/use-fly-to-cart-animation";
+import { getProductAvailability } from "@/lib/inventory";
 import {
   defaultImagePlaceholders,
   getImageUrl,
@@ -98,11 +99,9 @@ function MobileWishlistLineItem({
   const { flyToCart } = useFlyToCartAnimation();
   const [showAddedState, setShowAddedState] = useState(false);
   const addedStateTimerRef = useRef<number | null>(null);
-  const firstAvailableVariant = product.variants.find(
-    (variant) => variant.stock > 0,
-  );
-  const canAddToCart =
-    !product.variants.length || Boolean(firstAvailableVariant);
+  const productAvailability = getProductAvailability(product);
+  const firstAvailableVariant = productAvailability.variant;
+  const canAddToCart = productAvailability.purchasable;
   const imageSrc = getImageUrl(
     product.images[0],
     defaultImagePlaceholders.product,
@@ -202,7 +201,7 @@ function MobileWishlistLineItem({
               Added
             </span>
           ) : (
-            "Add To Cart"
+            productAvailability.buttonLabel
           )}
         </Button>
       </div>

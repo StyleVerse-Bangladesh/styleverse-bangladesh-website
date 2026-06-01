@@ -1,7 +1,8 @@
 import productData from "./products.json";
 import {
   categoryTaxonomy,
-  findCategoryByPath,
+  getCategoryById,
+  getCategoryByPath,
   getCategoryFilterOptions,
   type CategoryNode,
   type RootCategorySlug,
@@ -10,6 +11,7 @@ import {
   parseListingFilters,
   priceRangeOptions,
 } from "@/lib/catalog-filters";
+import { inventoryStatuses } from "@/lib/inventory";
 import type {
   ListingFilters,
   ListingSearchParams,
@@ -17,7 +19,12 @@ import type {
 } from "@/types/listing";
 import type { Product } from "@/types/product";
 
-export const products = productData as Product[];
+const staticProducts = productData as Product[];
+
+validateStaticProductCategories(staticProducts);
+validateStaticProductInventory(staticProducts);
+
+export const products = staticProducts;
 
 export type CategoryListingData = {
   category: CategoryNode;
@@ -28,9 +35,17 @@ export type CategoryListingData = {
 };
 
 const productsListingCategory: CategoryNode = {
+  id: "cat-products",
+  parentId: null,
   label: "Products",
   slug: "products",
   path: [],
+  rootSlug: "products",
+  depth: 0,
+  sortOrder: 0,
+  isActive: true,
+  showInNav: false,
+  showInFilter: true,
   children: categoryTaxonomy,
 };
 
@@ -58,7 +73,7 @@ export function getCategoryListingData({
   searchParams?: ListingSearchParams;
 }): CategoryListingData | null {
   const categoryPath = [rootSlug, ...slug];
-  const category = findCategoryByPath(categoryPath);
+  const category = getCategoryByPath(categoryPath);
 
   if (!category) {
     return null;
@@ -102,10 +117,22 @@ export function getProductsListingData({
 }
 
 export function getProductCategoryPath(product: Product) {
+  const primaryCategory = product.primaryCategoryId
+    ? getCategoryById(product.primaryCategoryId)
+    : undefined;
+
+  if (primaryCategory) {
+    return primaryCategory.path;
+  }
+
+  // Static products keep categoryPath for compatibility while the catalog
+  // migrates. Future admin/BMS products should store primaryCategoryId and
+  // optional categoryIds; categoryPath can be derived or cached from taxonomy.
   if (product.categoryPath?.length) {
     return product.categoryPath;
   }
 
+  // Legacy fallback for older product records that only have category strings.
   const rootSlug = product.department ?? product.gender;
 
   if (rootSlug === "unisex") {
@@ -119,10 +146,24 @@ export function getProductCategoryPath(product: Product) {
   ].filter(Boolean) as string[];
 }
 
+export function getProductPrimaryCategory(product: Product) {
+  const primaryCategory = product.primaryCategoryId
+    ? getCategoryById(product.primaryCategoryId)
+    : undefined;
+
+  if (primaryCategory) {
+    return primaryCategory;
+  }
+
+  return getDeepestCategoryByPath(getProductCategoryPath(product));
+}
+
 function getProductListingFacets(
   baseProducts: Product[],
   category: CategoryNode,
 ): ProductListingFacets {
+  // CATEGORY filter options come from taxonomy children; static product paths
+  // only decide disabled state until products migrate to category IDs.
   const categoryOptions = getCategoryFilterOptions(category);
   const categoryFilterIndex = category.path.length;
 
@@ -233,6 +274,107 @@ function startsWithPath(productPath: string[], path: string[]) {
 
 function isPriceInRange(price: number, min: number, max: number) {
   return price >= min && price <= max;
+}
+
+function getDeepestCategoryByPath(path: string[]) {
+  for (let length = path.length; length > 0; length -= 1) {
+    const category = getCategoryByPath(path.slice(0, length));
+
+    if (category) {
+      return category;
+    }
+  }
+
+  return undefined;
+}
+
+function validateStaticProductCategories(productsToValidate: Product[]) {
+  const errors: string[] = [];
+
+  for (const product of productsToValidate) {
+    const path = product.categoryPath ?? [];
+    const primaryCategory = product.primaryCategoryId
+      ? getCategoryById(product.primaryCategoryId)
+      : undefined;
+    const pathCategory = path.length ? getCategoryByPath(path) : undefined;
+
+    if (!product.primaryCategoryId) {
+      errors.push(`${product.id} (${product.slug}) is missing primaryCategoryId`);
+    } else if (!primaryCategory) {
+      errors.push(
+        `${product.id} (${product.slug}) primaryCategoryId "${product.primaryCategoryId}" does not exist`,
+      );
+    }
+
+    if (!path.length) {
+      errors.push(`${product.id} (${product.slug}) is missing categoryPath`);
+    } else if (!pathCategory) {
+      errors.push(
+        `${product.id} (${product.slug}) categoryPath "${path.join("/")}" does not resolve`,
+      );
+    }
+
+    if (
+      primaryCategory &&
+      pathCategory &&
+      primaryCategory.id !== pathCategory.id
+    ) {
+      errors.push(
+        `${product.id} (${product.slug}) primaryCategoryId "${primaryCategory.id}" does not match categoryPath "${path.join("/")}"`,
+      );
+    }
+  }
+
+  if (errors.length) {
+    throw new Error(
+      `Invalid static product category data:\n- ${errors.join("\n- ")}`,
+    );
+  }
+}
+
+function validateStaticProductInventory(productsToValidate: Product[]) {
+  const errors: string[] = [];
+
+  for (const product of productsToValidate) {
+    const variantKeys = new Set<string>();
+
+    for (const variant of product.variants) {
+      const variantLabel = `${product.id} (${product.slug}) variant ${variant.id}`;
+      const variantKey = `${variant.color.toLowerCase()}::${variant.size.toLowerCase()}`;
+
+      if (variantKeys.has(variantKey)) {
+        errors.push(
+          `${variantLabel} duplicates color/size "${variant.color} / ${variant.size}"`,
+        );
+      }
+
+      variantKeys.add(variantKey);
+
+      if (variant.stock < 0) {
+        errors.push(`${variantLabel} stock cannot be negative`);
+      }
+
+      if (
+        variant.status &&
+        !inventoryStatuses.includes(variant.status)
+      ) {
+        errors.push(`${variantLabel} status "${variant.status}" is invalid`);
+      }
+
+      if (
+        variant.preorder?.limit !== undefined &&
+        variant.preorder.limit <= 0
+      ) {
+        errors.push(`${variantLabel} preorder limit must be positive`);
+      }
+    }
+  }
+
+  if (errors.length) {
+    throw new Error(
+      `Invalid static product inventory data:\n- ${errors.join("\n- ")}`,
+    );
+  }
 }
 
 function slugify(value: string) {

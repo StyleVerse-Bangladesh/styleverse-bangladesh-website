@@ -11,6 +11,10 @@ import { Check, CreditCard, Minus, Plus, RefreshCcw, Star, Truck } from "lucide-
 import { useCartStore } from "@/store/cart-store";
 import { useFlyToCartAnimation } from "@/hooks/use-fly-to-cart-animation";
 import {
+  findPurchasableVariant,
+  getVariantAvailability,
+} from "@/lib/inventory";
+import {
   defaultImagePlaceholders,
   getImageUrl,
 } from "@/lib/constants/assets";
@@ -47,8 +51,7 @@ function findVariant(
   size: string | undefined,
 ) {
   return variants.find(
-    (variant) =>
-      variant.color === color && variant.size === size && variant.stock > 0,
+    (variant) => variant.color === color && variant.size === size,
   );
 }
 
@@ -57,7 +60,7 @@ export function MobileProductPurchasePanel({
 }: MobileProductPurchasePanelProps) {
   const addItem = useCartStore((state) => state.addItem);
   const { flyToCart } = useFlyToCartAnimation();
-  const firstAvailableVariant = product.variants.find((variant) => variant.stock > 0);
+  const firstAvailableVariant = findPurchasableVariant(product);
   const [color, setColor] = useState(
     firstAvailableVariant?.color ?? product.colors[0]?.name,
   );
@@ -70,12 +73,22 @@ export function MobileProductPurchasePanel({
     () => findVariant(product.variants, color, size),
     [color, product.variants, size],
   );
+  const selectedAvailability = selectedVariant
+    ? getVariantAvailability(selectedVariant)
+    : undefined;
   const discountPercent = getDiscountPercent(product);
-  const canPurchase = product.variants.length ? Boolean(selectedVariant) : true;
+  const canPurchase = Boolean(selectedAvailability?.purchasable);
+  const maxQuantity = selectedAvailability?.maxQuantity;
   const productImageSrc = getImageUrl(
     product.images[0],
     defaultImagePlaceholders.product,
   );
+
+  useEffect(() => {
+    if (maxQuantity !== undefined && quantity > maxQuantity) {
+      setQuantity(Math.max(1, maxQuantity));
+    }
+  }, [maxQuantity, quantity]);
 
   useEffect(() => {
     return () => {
@@ -91,8 +104,15 @@ export function MobileProductPurchasePanel({
       return false;
     }
 
-    addItem(product, selectedVariant?.id, quantity);
-    setStatus(`${quantity} ${product.name} added to cart.`);
+    const quantityToAdd =
+      maxQuantity === undefined ? quantity : Math.min(quantity, maxQuantity);
+
+    addItem(product, selectedVariant?.id, quantityToAdd);
+    setStatus(
+      selectedAvailability?.isPreorder
+        ? `${quantityToAdd} ${product.name} pre order added to cart.`
+        : `${quantityToAdd} ${product.name} added to cart.`,
+    );
     return true;
   }
 
@@ -164,9 +184,9 @@ export function MobileProductPurchasePanel({
           </div>
           <div className="flex flex-wrap gap-2">
             {product.colors.map((productColor) => {
-              const disabled =
-                product.variants.length > 0 &&
-                !findVariant(product.variants, productColor.name, size);
+              const disabled = !product.variants.some(
+                (variant) => variant.color === productColor.name,
+              );
               const selected = color === productColor.name;
 
               return (
@@ -205,9 +225,9 @@ export function MobileProductPurchasePanel({
           </div>
           <div className="flex flex-wrap gap-2">
             {product.sizes.map((productSize) => {
-              const disabled =
-                product.variants.length > 0 &&
-                !findVariant(product.variants, color, productSize);
+              const disabled = !product.variants.some(
+                (variant) => variant.size === productSize,
+              );
               const selected = size === productSize;
 
               return (
@@ -252,7 +272,11 @@ export function MobileProductPurchasePanel({
           </span>
           <button
             type="button"
-            className="flex h-11 w-11 items-center justify-center text-black transition"
+            className="flex h-11 w-11 items-center justify-center text-black transition disabled:text-zinc-300"
+            disabled={
+              !canPurchase ||
+              (maxQuantity !== undefined && quantity >= maxQuantity)
+            }
             onClick={() => setQuantity((current) => current + 1)}
             aria-label="Increase quantity"
           >
@@ -260,6 +284,10 @@ export function MobileProductPurchasePanel({
           </button>
         </div>
       </section>
+
+      <p className="text-sm font-semibold text-black">
+        {selectedAvailability?.label ?? "Out of Stock"}
+      </p>
 
       <button
         type="button"
@@ -273,7 +301,7 @@ export function MobileProductPurchasePanel({
             Added
           </span>
         ) : (
-          "Add To Cart"
+          (selectedAvailability?.buttonLabel ?? "Out of Stock")
         )}
       </button>
 

@@ -10,7 +10,15 @@ import {
   SiteBreadcrumb,
   type BreadcrumbItem,
 } from "@/components/shared/site-breadcrumb";
-import { getProductBySlug, products } from "@/data/catalog";
+import {
+  getProductBySlug,
+  getProductPrimaryCategory,
+  products,
+} from "@/data/catalog";
+import {
+  buildCategoryHref,
+  getCategoryPathNodes,
+} from "@/data/category-taxonomy";
 import { siteContainerClassName } from "@/lib/constants/layout";
 import type { Product } from "@/types/product";
 
@@ -22,37 +30,18 @@ export function generateStaticParams() {
   return products.map((product) => ({ slug: product.slug }));
 }
 
-const categoryPathByKey: Record<string, string> = {
-  accessories: "/accessories",
-  kids: "/kids",
-  men: "/men",
-  "seasonal fits": "/seasonal-fits",
-  "seasonal-fits": "/seasonal-fits",
-  shoes: "/shoes",
-  sports: "/sports",
-  women: "/women",
-};
-
-function normalizeCategoryKey(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function getCategoryBreadcrumb(product: Product): BreadcrumbItem {
-  // Later, product admin data can supply subcategoryLabel/subcategoryHref here.
-  const genderKey = normalizeCategoryKey(product.gender);
-  const categoryKey = normalizeCategoryKey(product.category);
-  const href = categoryPathByKey[genderKey] ?? categoryPathByKey[categoryKey];
-
-  return {
-    label: product.category || "Products",
-    href: href ?? "/products",
-  };
-}
-
 function getProductBreadcrumbItems(product: Product): BreadcrumbItem[] {
+  const category = getProductPrimaryCategory(product);
+  const categoryItems = category
+    ? getCategoryPathNodes(category).map((item) => ({
+        label: item.label,
+        href: buildCategoryHref(item),
+      }))
+    : [{ label: "Products", href: "/products" }];
+
   return [
     { label: "Home", href: "/" },
-    getCategoryBreadcrumb(product),
+    ...categoryItems,
     { label: product.name },
   ];
 }
