@@ -3,7 +3,10 @@ import { RouteShell } from "@/components/shared/route-shell";
 
 export default function CheckoutPage() {
   return (
-    <RouteShell title="Checkout" description="Checkout form skeleton with Zod validation.">
+    <RouteShell
+      title="Checkout"
+      description="Review your cart, delivery details, and payment method."
+    >
       <CheckoutForm />
     </RouteShell>
   );
