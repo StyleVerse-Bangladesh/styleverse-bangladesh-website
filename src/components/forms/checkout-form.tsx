@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, CreditCard, MapPin, Truck, User } from "lucide-react";
 import { useForm, type FieldError } from "react-hook-form";
@@ -10,7 +10,10 @@ import { Price } from "@/components/product/price";
 import { products } from "@/data/catalog";
 import { useCartStore } from "@/store/cart-store";
 import type { CartItem } from "@/types/cart";
+import { validateCoupon } from "@/lib/coupons";
+import { getLineItemTotal, getOrderPricing } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
+import { useCartSummary } from "@/hooks/use-cart-summary";
 import { checkoutSchema, type CheckoutValues } from "./schemas";
 
 type CheckoutSectionProps = {
@@ -45,6 +48,8 @@ const mockOrderItems: SummaryItem[] = products.slice(0, 2).map((product, index) 
 
 export function CheckoutForm() {
   const cartItems = useCartStore((state) => state.items);
+  const cartSummary = useCartSummary();
+  const [couponSubmitError, setCouponSubmitError] = useState("");
   const form = useForm<CheckoutValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
@@ -64,19 +69,42 @@ export function CheckoutForm() {
   const paymentMethod = form.watch("paymentMethod");
   const summaryItems = cartItems.length ? mapCartItems(cartItems) : mockOrderItems;
   const isMockOrder = cartItems.length === 0;
-  const subtotal = summaryItems.reduce(
-    (total, item) => total + item.price * item.quantity,
-    0,
-  );
-  const deliveryFee = subtotal > 0 ? 80 : 0;
-  const total = subtotal + deliveryFee;
+  const mockPricing = getOrderPricing(summaryItems);
+  const subtotal = isMockOrder ? mockPricing.subtotal : cartSummary.subtotal;
+  const deliveryFee = isMockOrder
+    ? mockPricing.deliveryFee
+    : cartSummary.deliveryFee;
+  const couponDiscount = isMockOrder ? 0 : cartSummary.couponDiscount;
+  const shippingDiscount = isMockOrder ? 0 : cartSummary.shippingDiscount;
+  const total = isMockOrder ? mockPricing.total : cartSummary.total;
+  const appliedCoupon = isMockOrder ? undefined : cartSummary.appliedCoupon;
+  const isCouponApplicable = isMockOrder
+    ? false
+    : cartSummary.isCouponApplicable;
   const errorCount = Object.keys(errors).length;
+
+  function handlePlaceOrder() {
+    setCouponSubmitError("");
+
+    if (appliedCoupon) {
+      const result = validateCoupon(appliedCoupon.code, subtotal);
+
+      if (!result.isValid) {
+        setCouponSubmitError(
+          result.error ?? "Coupon no longer applies to this order.",
+        );
+        return;
+      }
+    }
+
+    // Future backend/BMS order creation must revalidate coupons server-side.
+  }
 
   return (
     <form
       id="checkout-form"
       className="relative min-w-0 max-w-full"
-      onSubmit={form.handleSubmit(() => undefined)}
+      onSubmit={form.handleSubmit(handlePlaceOrder)}
       noValidate
     >
       {errorCount > 0 ? (
@@ -85,6 +113,14 @@ export function CheckoutForm() {
           role="alert"
         >
           Review the highlighted checkout details before placing the order.
+        </div>
+      ) : null}
+      {couponSubmitError ? (
+        <div
+          className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+          role="alert"
+        >
+          {couponSubmitError}
         </div>
       ) : null}
 
@@ -340,7 +376,11 @@ export function CheckoutForm() {
           items={summaryItems}
           subtotal={subtotal}
           deliveryFee={deliveryFee}
+          couponDiscount={couponDiscount}
+          shippingDiscount={shippingDiscount}
           total={total}
+          appliedCouponCode={appliedCoupon?.code}
+          isCouponApplicable={isCouponApplicable}
           isMockOrder={isMockOrder}
           isSubmitting={isSubmitting}
         />
@@ -419,14 +459,22 @@ function OrderSummary({
   items,
   subtotal,
   deliveryFee,
+  couponDiscount,
+  shippingDiscount,
   total,
+  appliedCouponCode,
+  isCouponApplicable,
   isMockOrder,
   isSubmitting,
 }: {
   items: SummaryItem[];
   subtotal: number;
   deliveryFee: number;
+  couponDiscount: number;
+  shippingDiscount: number;
   total: number;
+  appliedCouponCode?: string;
+  isCouponApplicable: boolean;
   isMockOrder: boolean;
   isSubmitting: boolean;
 }) {
@@ -463,7 +511,7 @@ function OrderSummary({
               </p>
             </div>
             <Price
-              price={item.price * item.quantity}
+              price={getLineItemTotal(item)}
               className="shrink-0 justify-end"
             />
           </div>
@@ -473,7 +521,34 @@ function OrderSummary({
       <div className="mt-4 grid gap-3 border-t pt-4 text-sm">
         <SummaryRow label="Subtotal" value={<Price price={subtotal} />} />
         <SummaryRow label="Delivery" value={<Price price={deliveryFee} />} />
-        <SummaryRow label="Discount" value="None" />
+        {couponDiscount > 0 && appliedCouponCode ? (
+          <SummaryRow
+            label={`Coupon (${appliedCouponCode})`}
+            value={
+              <Price
+                price={-couponDiscount}
+                className="justify-end text-emerald-700"
+              />
+            }
+          />
+        ) : null}
+        {shippingDiscount > 0 && appliedCouponCode ? (
+          <SummaryRow
+            label={`Shipping Discount (${appliedCouponCode})`}
+            value={
+              <Price
+                price={-shippingDiscount}
+                className="justify-end text-emerald-700"
+              />
+            }
+          />
+        ) : null}
+        {appliedCouponCode && !isCouponApplicable ? (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+            Coupon no longer applies to this order.
+          </p>
+        ) : null}
+        {!appliedCouponCode ? <SummaryRow label="Discount" value="None" /> : null}
       </div>
 
       <div className="mt-4 border-t pt-4">
