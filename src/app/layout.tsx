@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
 import { AppProviders } from "@/providers/app-providers";
 import { SiteShell } from "@/components/layout/site-shell";
@@ -32,7 +32,13 @@ export const metadata: Metadata = {
   description:
     "Premium fashion ecommerce frontend foundation for StyleVerse Bangladesh.",
   applicationName: "StyleVerse Bangladesh",
+  manifest: "/manifest.webmanifest",
   keywords: ["fashion", "ecommerce", "Bangladesh", "menswear", "womenswear"],
+  appleWebApp: {
+    capable: true,
+    title: "StyleVerse",
+    statusBarStyle: "default",
+  },
   openGraph: {
     title: "StyleVerse Bangladesh",
     description:
@@ -45,6 +51,10 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#111111",
 };
 
 export default function RootLayout({
