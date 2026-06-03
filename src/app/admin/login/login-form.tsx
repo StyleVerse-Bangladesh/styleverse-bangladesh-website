@@ -6,7 +6,7 @@ import { LockKeyhole } from "lucide-react";
 import {
   loginAdminAction,
   type AdminLoginState,
-} from "@/app/bms/login/actions";
+} from "@/app/admin/login/actions";
 
 const initialState: AdminLoginState = {};
 

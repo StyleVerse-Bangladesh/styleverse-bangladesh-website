@@ -7,7 +7,7 @@ import {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (!pathname.startsWith("/bms")) {
+  if (!pathname.startsWith("/admin")) {
     return NextResponse.next();
   }
 
@@ -15,16 +15,16 @@ export async function middleware(request: NextRequest) {
     request.cookies.get(adminSessionCookieName)?.value,
   );
 
-  if (pathname === "/bms/login") {
+  if (pathname === "/admin/login") {
     if (session) {
-      return NextResponse.redirect(new URL("/bms", request.url));
+      return NextResponse.redirect(new URL("/admin", request.url));
     }
 
     return NextResponse.next();
   }
 
   if (!session) {
-    const loginUrl = new URL("/bms/login", request.url);
+    const loginUrl = new URL("/admin/login", request.url);
     loginUrl.searchParams.set("next", pathname);
 
     return NextResponse.redirect(loginUrl);
@@ -34,5 +34,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/bms/:path*"],
+  matcher: ["/admin/:path*"],
 };

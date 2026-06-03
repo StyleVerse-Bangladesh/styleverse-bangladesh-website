@@ -51,5 +51,5 @@ export async function loginAdminAction(
   });
   await createSession(admin.id, admin.roleId);
 
-  redirect("/bms");
+  redirect("/admin");
 }

@@ -45,6 +45,9 @@ enum CampaignType {
 enum OrderStatus {
   PENDING
   CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
   CANCELLED
   COMPLETED
 }
@@ -58,6 +61,7 @@ enum PaymentStatus {
 
 enum DeliveryStatus {
   PENDING
+  PACKING
   PROCESSING
   SHIPPED
   DELIVERED
@@ -194,6 +198,40 @@ model ProductImage {
   @@index([productId])
   @@index([productId, isPrimary])
   @@map("product_images")
+}
+
+model MediaFile {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  filename        String
+  storedFilename  String    @unique @map("stored_filename")
+  url             String    @unique
+  mimeType        String    @map("mime_type")
+  sizeBytes       Int       @map("size_bytes")
+  storageProvider String    @default("local") @map("storage_provider")
+  storagePath     String    @map("storage_path")
+  publicId        String?   @unique @map("public_id")
+  secureUrl       String?   @map("secure_url")
+  format          String?
+  width           Int?
+  height          Int?
+  bytes           Int?
+  originalFilename String?  @map("original_filename")
+  originalFormat  String?   @map("original_format")
+  originalWidth   Int?      @map("original_width")
+  originalHeight  Int?      @map("original_height")
+  originalBytes   Int?      @map("original_bytes")
+  folder          String?
+  altText         String?   @map("alt_text")
+  uploadedAt      DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([filename])
+  @@index([folder])
+  @@index([publicId])
+  @@index([uploadedAt])
+  @@index([deletedAt])
+  @@map("media_files")
 }
 
 model ProductVariant {
@@ -448,8 +486,9 @@ model OrderItem {
 model OrderStatusHistory {
   id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderId          String       @map("order_id") @db.Uuid
-  fromStatus       OrderStatus? @map("from_status")
-  toStatus         OrderStatus  @map("to_status")
+  statusType       String       @default("ORDER") @map("status_type")
+  fromStatus       String?      @map("from_status")
+  toStatus         String       @map("to_status")
   note             String?
   changedByAdminId String?      @map("changed_by_admin_id") @db.Uuid
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -459,6 +498,7 @@ model OrderStatusHistory {
 
   @@index([orderId])
   @@index([createdAt])
+  @@index([statusType])
   @@map("order_status_history")
 }
 

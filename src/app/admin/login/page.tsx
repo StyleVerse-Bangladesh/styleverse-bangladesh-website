@@ -1,19 +1,19 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { AdminLoginForm } from "@/app/bms/login/login-form";
+import { AdminLoginForm } from "@/app/admin/login/login-form";
 import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "BMS Login",
+  title: "Admin Login",
 };
 
 export default async function AdminLoginPage() {
   const session = await getSession();
 
   if (session) {
-    redirect("/bms");
+    redirect("/admin");
   }
 
   return (

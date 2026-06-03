@@ -5,5 +5,5 @@ import { destroySession } from "@/lib/auth/session";
 
 export async function logoutAdminAction() {
   await destroySession();
-  redirect("/bms/login");
+  redirect("/admin/login");
 }

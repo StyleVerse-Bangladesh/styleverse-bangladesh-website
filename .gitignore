@@ -37,6 +37,10 @@ yarn-error.log*
 .codex-verification/
 test-results/
 
+# local media uploads
+/public/uploads/media/*
+!/public/uploads/media/.gitkeep
+
 # env files (can opt-in for committing if needed)
 .env*
 

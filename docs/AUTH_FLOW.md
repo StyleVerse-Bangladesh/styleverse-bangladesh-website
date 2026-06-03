@@ -1,6 +1,6 @@
-# BMS Admin Auth Flow
+# Admin Auth Flow
 
-This document describes the backend authentication foundation for future StyleVerse BMS/Admin login.
+This document describes the backend authentication foundation for future StyleVerse Admin login.
 
 ## Flow
 
@@ -67,6 +67,6 @@ Future session payload should include:
 
 ## Request Authorization
 
-Every protected BMS route or API handler should authorize using role and permission checks before executing business logic.
+Every protected `/admin` route or API handler should authorize using role and permission checks before executing business logic.
 
 Do not trust client-side checks for admin authorization.
