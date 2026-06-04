@@ -25,13 +25,12 @@ import { useCartSummary } from "@/hooks/use-cart-summary";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/ui-store";
 import { useWishlistStore } from "@/store/wishlist-store";
+import type { StorefrontSettingsDto } from "@/types/api/settings.dto";
 import { MegaMenuShell } from "./mega-menu-shell";
 
-const logoSrc = "/logo/StyleVerse-Logo-Long-Black.png";
-const logoAlt = "StyleVerse Bangladesh";
 const megaMenuCloseDelay = 250;
 
-export function Header() {
+export function Header({ settings }: { settings: StorefrontSettingsDto }) {
   const pathname = usePathname();
   const { itemCount } = useCartSummary();
   const wishlistCount = useWishlistStore((state) => state.productIds.length);
@@ -108,10 +107,18 @@ export function Header() {
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <StyleVerseLogo className="hidden md:block" />
+              <StyleVerseLogo
+                alt={settings.storeName}
+                className="hidden md:block"
+                src={settings.logo.header}
+              />
             </div>
 
-            <StyleVerseLogo className="justify-self-center md:hidden" />
+            <StyleVerseLogo
+              alt={settings.storeName}
+              className="justify-self-center md:hidden"
+              src={settings.logo.header}
+            />
 
             <div className="relative hidden w-full md:col-span-1 md:block">
               <Input
@@ -248,8 +255,10 @@ export function Header() {
           </Button>
 
           <StyleVerseLogo
+            alt={settings.storeName}
             className="justify-self-center md:justify-self-auto"
             onMouseEnter={closeMegaMenu}
+            src={settings.logo.header}
           />
 
           <nav className="hidden min-w-0 flex-1 items-center justify-center md:flex">
@@ -360,11 +369,15 @@ function WishlistCountBadge({ count }: { count: number }) {
 }
 
 function StyleVerseLogo({
+  alt,
   className,
   onMouseEnter,
+  src,
 }: {
+  alt: string;
   className?: string;
   onMouseEnter?: MouseEventHandler<HTMLAnchorElement>;
+  src: string;
 }) {
   return (
     <Link
@@ -373,16 +386,21 @@ function StyleVerseLogo({
         "relative block h-[22px] w-[151px] shrink-0 min-[360px]:h-[24px] min-[360px]:w-[165px] xs:h-[26px] xs:w-[178px] sm:h-[28px] sm:w-[192px] lg:h-[32px] lg:w-[219px]",
         className,
       )}
-      aria-label={logoAlt}
+      aria-label={alt}
       onMouseEnter={onMouseEnter}
     >
       <Image
-        src={logoSrc}
-        alt={logoAlt}
+        src={src}
+        alt={alt}
         fill
         sizes="(min-width: 1024px) 219px, (min-width: 640px) 192px, (min-width: 480px) 151px, (min-width: 360px) 130px, 96px"
         className="object-contain object-left dark:invert"
+        unoptimized={isExternalImage(src)}
       />
     </Link>
   );
+}
+
+function isExternalImage(src: string) {
+  return /^https?:\/\//i.test(src);
 }

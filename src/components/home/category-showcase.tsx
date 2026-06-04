@@ -45,21 +45,33 @@ const categoryGroups: CategoryGroup[] = [
   },
 ];
 
-export function CategoryShowcase() {
+type CategoryShowcaseProps = {
+  groups?: CategoryGroup[];
+  title?: string;
+};
+
+export function CategoryShowcase({
+  groups = categoryGroups,
+  title = "SHOP BY CATEGORY",
+}: CategoryShowcaseProps) {
+  if (groups.length === 0) {
+    return null;
+  }
+
   return (
     <section className="bg-white py-5 sm:py-12" aria-label="Categories">
       <div className={siteContainerClassName}>
         <div className="relative border-b border-black/10 pb-2.5 text-center sm:pb-5">
-          <HomeSectionHeading>SHOP BY CATEGORY</HomeSectionHeading>
+          <HomeSectionHeading>{title}</HomeSectionHeading>
           <span className="mx-auto mt-2 block h-px w-32 bg-black/35 sm:mt-4 sm:h-0.5 sm:w-56 sm:bg-black" />
         </div>
 
         <div className="mt-4 md:hidden">
-          <MobileCategoryGroupsCarousel groups={categoryGroups} />
+          <MobileCategoryGroupsCarousel groups={groups} />
         </div>
 
         <div className="mt-4 hidden gap-5 sm:mt-10 md:grid md:grid-cols-2 xl:grid-cols-4">
-          {categoryGroups.map((group, index) => (
+          {groups.map((group, index) => (
             <CategoryGroupCard
               key={group.title}
               group={group}

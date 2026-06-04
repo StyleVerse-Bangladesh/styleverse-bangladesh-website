@@ -37,13 +37,25 @@ The future BMS/Admin panel should become the single dynamic control center for b
 | Coupon validation | Frontend `validateCoupon()` | BMS/backend coupon API | Backend must validate coupon before order creation. |
 | Inventory validation | Frontend inventory helpers | BMS/backend inventory API | Backend must check stock/preorder limits at checkout. |
 | Order creation | Not implemented | BMS/backend orders | Checkout currently does not create orders. |
+| Invoice generation | Not implemented | BMS/backend invoices | Order creation should generate immutable invoice snapshots with invoice numbers and future HTML/PDF output. |
+| Invoice PDF downloads | Not implemented | BMS/backend invoices | Admin and customer downloads should be served through authenticated routes, not direct private storage URLs. |
 | Payment status | Not implemented | BMS/payment backend | BMS should track COD, online payment, failed, paid, refunded states. |
+| Payment gateway settings | Not implemented | BMS/Admin payment settings | Admin should configure supported online payment gateways without exposing secret keys to the browser. |
+| Payment transactions | Not implemented | BMS/payment backend | Online payment attempts, gateway references, amounts, statuses, and refunds should be stored as canonical backend records. |
+| Payment events | Not implemented | BMS/payment backend | Gateway webhook/status-sync payloads should be logged safely and used to update order payment status server-side. |
 | Delivery status | Not implemented | BMS/order fulfillment | BMS should track processing, shipped, delivered, cancelled, returned. |
+| Pathao courier credentials | Not implemented | BMS/Admin courier settings | Merchant credentials should be server-only and encrypted or stored in protected environment configuration. |
+| Courier shipments | Not implemented | BMS/order fulfillment | Shipment creation, courier tracking IDs, delivery status, and shipment snapshots should be owned by BMS/backend. |
+| Courier city/zone/area mapping | Not implemented | BMS/Admin courier settings | Pathao city, zone, and area IDs should be mapped to checkout/order addresses before shipment creation. |
+| Courier events | Not implemented | BMS/order fulfillment | Pathao shipment status sync and tracking events should be stored as backend event logs. |
+| Customer fraud/risk checks | Not implemented | BMS/order risk service | Phone-based risk checks should summarize previous order outcomes and expose a LOW/MEDIUM/HIGH risk label to admins. |
+| Customer risk notes | Not implemented | BMS/Admin orders | Risk notes should be visible in order details and should not be trusted from frontend input. |
 | OTP login | Placeholder frontend UI | BMS/backend auth | OTP send/verify must be server-backed. |
 | Customer profile | Not implemented | BMS/backend customer service | Includes name, phone, email, and preferences. |
 | Saved addresses | Not implemented | BMS/backend customer service | Checkout should eventually support customer address book. |
 | Wishlist persistence | Frontend client store | BMS/backend customer service | Guest wishlist can remain local, authenticated wishlist should persist. |
 | Order history | Not implemented | BMS/backend customer service | Customer account should read canonical order history from API. |
+| Customer invoice history | Not implemented | BMS/backend invoices | Customer dashboard should show invoice number, order date, total, payment status, and PDF download access for owned orders. |
 | Logo | Header/footer static image paths | BMS/Admin store settings | Frontend may keep fallback assets. |
 | Store name | `src/lib/constants/site.ts` and metadata | BMS/Admin store settings | API/settings should supply display name later. |
 | Contact info | Hardcoded footer/contact content | BMS/Admin store settings | Phone, email, address, and support hours should be editable. |
@@ -88,6 +100,107 @@ BMS/backend must own cart pricing validation, coupon validation, inventory valid
 
 The frontend should submit product IDs, variant IDs, quantities, customer details, address, delivery method, payment method, and optional coupon code. The backend should calculate final totals and store the order snapshot.
 
+Order operations should eventually include payment transaction tracking, courier shipment creation, shipment status sync, and customer risk checks. Admins should make fulfillment decisions from backend-owned payment, courier, and risk records, never from frontend-calculated status.
+
+### Invoices
+
+BMS/backend should automatically generate an invoice when a customer places an order.
+
+Invoice generation should:
+
+- Create a unique invoice number.
+- Create an immutable invoice snapshot from the order snapshot.
+- Support future HTML and PDF invoice output.
+- Preserve invoice content after creation even if product, customer, address, or order source data changes.
+
+Admin invoice access should allow admins to:
+
+- View an invoice from order details.
+- Download the invoice PDF.
+- Regenerate an invoice only when a future policy explicitly allows it.
+- See customer order and invoice history.
+
+Customer invoice access should allow authenticated customers to:
+
+- View invoices under My Orders.
+- Download invoice PDFs for their own orders.
+- See invoice number, order date, total, and payment status.
+
+Recommended dedicated table:
+
+- `invoices`
+
+Recommended fields:
+
+- `id`
+- `orderId`
+- `customerId`
+- `invoiceNumber`
+- `invoiceStatus`
+- `subtotalSnapshot`
+- `deliveryFeeSnapshot`
+- `couponDiscountSnapshot`
+- `shippingDiscountSnapshot`
+- `grandTotalSnapshot`
+- `customerSnapshot` jsonb
+- `addressSnapshot` jsonb
+- `itemsSnapshot` jsonb
+- `pdfUrl`
+- `generatedAt`
+- `createdAt`
+
+Future routes and APIs:
+
+- Admin view: `GET /admin/orders/:id/invoice`
+- Admin download: `GET /api/admin/orders/:id/invoice/download`
+- Customer view: `GET /account/orders/:id/invoice`
+- Customer download: `GET /api/account/orders/:id/invoice/download`
+
+### Payment Gateway
+
+BMS/Admin should support payment gateway settings, payment transactions, payment status sync, COD and online payment, order payment status updates, and refund tracking when required.
+
+Future table ideas:
+
+- `payment_gateways`
+- `payment_transactions`
+- `payment_events`
+
+Payment gateway records should separate configuration from transaction history. Transactions should store gateway reference IDs, order IDs, amount, currency, status, payment method, provider response summaries, and refund references where applicable.
+
+### Pathao Courier
+
+BMS/Admin should support Pathao merchant credentials, shipment creation from orders, courier city/zone/area mapping, delivery charge calculation if Pathao exposes it, shipment tracking, delivery status sync, and courier events/logs.
+
+Future table ideas:
+
+- `courier_accounts`
+- `courier_shipments`
+- `courier_events`
+- `courier_area_mappings`
+
+Pathao integration should be backend-only. Order details can expose shipment actions later, but API calls and credentials must stay server-side.
+
+### Customer Fraud and Risk
+
+BMS/Admin should support phone-number based fraud/risk checks. If Pathao merchant/customer history data is available, the risk service can combine it with internal order history.
+
+Risk check output should include:
+
+- Total previous orders.
+- Delivered count.
+- Cancelled count.
+- Returned count.
+- Success rate.
+- Risk label: LOW, MEDIUM, or HIGH.
+- Risk notes for order details.
+
+Future table idea:
+
+- `customer_risk_checks`
+
+Risk labels should guide admin review, not automatically reject customers unless a future business rule explicitly requires it.
+
 ### Customers
 
 BMS/backend should own OTP login, customer profile, saved addresses, wishlist persistence, and order history.
@@ -100,6 +213,46 @@ BMS/Admin should control logo, store name, contact info, social links, footer li
 
 Core frontend layout and design tokens should stay in the codebase unless the business explicitly needs theme customization.
 
+## Future Order Details Workflow
+
+```text
+Order created
+  |
+  v
+Invoice snapshot generated
+  |
+  v
+Admin opens order
+  |
+  v
+Fraud check by phone
+  |
+  v
+Admin confirms or rejects
+  |
+  v
+Courier shipment created via Pathao
+  |
+  v
+Payment and courier status sync
+  |
+  v
+Delivery complete
+```
+
+## Security Notes
+
+- API credentials must stay in environment variables or encrypted database fields.
+- Never expose Pathao, courier, or payment gateway secret keys to browser code.
+- All courier and payment API calls must run server-side only.
+- Store API logs safely and avoid persisting unnecessary secrets or full sensitive payloads.
+- Do not trust frontend payment status, courier status, delivery fee, fraud status, or risk labels.
+- Gateway webhooks and courier sync jobs must verify provider authenticity before mutating order state.
+- Customer invoice routes must verify invoice ownership before returning invoice details or downloads.
+- Admin invoice routes must require authenticated admin access.
+- Invoice PDF URLs should not expose private storage directly if invoice files contain sensitive customer/order data.
+- Invoice snapshots must remain unchanged when product, customer, address, or order data changes later.
+
 ## Developer Rules
 
 - Do not hardcode future business data in components.
@@ -111,3 +264,5 @@ Core frontend layout and design tokens should stay in the codebase unless the bu
 - Keep BMS-specific response shapes out of UI components.
 - Keep fallback data small, obvious, and easy to delete after API integration.
 - Revalidate cart, coupon, inventory, delivery fee, and payment status server-side before order creation.
+- Payment, courier, and fraud/risk status changes must be derived from backend services, admin actions, or verified provider callbacks.
+- Generate invoices from backend-owned order snapshots, not client-calculated checkout data.

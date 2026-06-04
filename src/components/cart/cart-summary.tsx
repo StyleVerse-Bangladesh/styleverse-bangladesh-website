@@ -14,10 +14,15 @@ import { getLineItemTotal } from "@/lib/pricing";
 import { useCartStore } from "@/store/cart-store";
 import { useCartSummary } from "@/hooks/use-cart-summary";
 import type { CartItem } from "@/types/cart";
+import type { StorefrontSettingsDto } from "@/types/api/settings.dto";
 
-export function CartSummary() {
+export function CartSummary({
+  deliverySettings,
+}: {
+  deliverySettings: StorefrontSettingsDto["delivery"];
+}) {
   const items = useCartStore((state) => state.items);
-  const summary = useCartSummary();
+  const summary = useCartSummary(deliverySettings);
 
   if (!items.length) {
     return <EmptyCartState />;

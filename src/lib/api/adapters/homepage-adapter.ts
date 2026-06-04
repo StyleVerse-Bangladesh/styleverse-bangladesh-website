@@ -24,6 +24,19 @@ export type HomepageContent = {
   newArrivals: HomeProductCardProduct[];
   recommendedProductIds: string[];
   featureStrip: HomepageFeature[];
+  sections: {
+    categoryGroups: HomepageSectionState;
+    featureStrip: HomepageSectionState;
+    hero: HomepageSectionState;
+    newArrivals: HomepageSectionState;
+    recommendedProducts: HomepageSectionState;
+  };
+};
+
+export type HomepageSectionState = {
+  enabled: boolean;
+  subtitle?: string;
+  title: string;
 };
 
 export function mapHomepageDtoToHomepageContent(
@@ -70,9 +83,23 @@ export function mapHomepageDtoToHomepageContent(
         title: feature.title,
         icon: feature.icon,
       })),
+    sections: {
+      categoryGroups: sectionState("SHOP BY CATEGORY"),
+      featureStrip: sectionState("Feature Strip"),
+      hero: sectionState("Hero"),
+      newArrivals: sectionState("New Arrival Products"),
+      recommendedProducts: sectionState("Product You May Like"),
+    },
   };
 }
 
 function sortBySortOrder(left: { sortOrder: number }, right: { sortOrder: number }) {
   return left.sortOrder - right.sortOrder;
+}
+
+function sectionState(title: string): HomepageSectionState {
+  return {
+    enabled: true,
+    title,
+  };
 }

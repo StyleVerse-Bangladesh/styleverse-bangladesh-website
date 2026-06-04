@@ -11,7 +11,17 @@ import Image from "next/image";
 import { motion, type PanInfo } from "framer-motion";
 import { assets, imageSizes } from "@/lib/constants/assets";
 
-const heroSlides = [
+type HeroSlide = {
+  alt: string;
+  category: string;
+  height: number;
+  href: string;
+  id: string;
+  image: string;
+  width: number;
+};
+
+const heroSlides: HeroSlide[] = [
   {
     id: "hero-banner-1",
     image: assets.heroImage("hero-1.webp"),
@@ -60,13 +70,18 @@ const heroSlides = [
 ];
 
 const autoplayInterval = 5000;
-const loopedHeroSlides = [
-  heroSlides[heroSlides.length - 1],
-  ...heroSlides,
-  heroSlides[0],
-];
 
-export function HeroBanner() {
+type HeroBannerProps = {
+  slides?: HeroSlide[];
+};
+
+export function HeroBanner({ slides = heroSlides }: HeroBannerProps) {
+  const renderedSlides = slides.length ? slides : heroSlides;
+  const loopedHeroSlides = [
+    renderedSlides[renderedSlides.length - 1],
+    ...renderedSlides,
+    renderedSlides[0],
+  ];
   const [activeSlide, setActiveSlide] = useState(0);
   const [visualSlide, setVisualSlide] = useState(1);
   const [bannerWidth, setBannerWidth] = useState(0);
@@ -108,16 +123,16 @@ export function HeroBanner() {
   const goToPreviousSlide = useCallback(() => {
     setIsTrackTransitionEnabled(true);
     setActiveSlide(
-      (current) => (current - 1 + heroSlides.length) % heroSlides.length,
+      (current) => (current - 1 + renderedSlides.length) % renderedSlides.length,
     );
     setVisualSlide((current) => current - 1);
-  }, []);
+  }, [renderedSlides.length]);
 
   const goToNextSlide = useCallback(() => {
     setIsTrackTransitionEnabled(true);
-    setActiveSlide((current) => (current + 1) % heroSlides.length);
+    setActiveSlide((current) => (current + 1) % renderedSlides.length);
     setVisualSlide((current) => current + 1);
-  }, []);
+  }, [renderedSlides.length]);
 
   useEffect(() => {
     if (isDragging) {
@@ -161,7 +176,7 @@ export function HeroBanner() {
       return;
     }
 
-    if (visualSlide === heroSlides.length + 1) {
+    if (visualSlide === renderedSlides.length + 1) {
       snapToVisualSlide(1);
     }
   }
@@ -263,7 +278,7 @@ export function HeroBanner() {
 
       <div className="pointer-events-none absolute inset-0">
         <div className="pointer-events-auto absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white/25 px-2 py-1 shadow-sm backdrop-blur-sm sm:bottom-4">
-          {heroSlides.map((item, index) => (
+          {renderedSlides.map((item, index) => (
             <button
               key={item.id}
               type="button"

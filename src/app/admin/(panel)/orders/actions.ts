@@ -31,6 +31,12 @@ const deliveryStatusOptions = [
 ] as const;
 
 type StatusType = "DELIVERY" | "ORDER" | "PAYMENT";
+type OrderOperationValidation = { orderId: string } | { error: string };
+
+export type OrderActionState = {
+  message?: string;
+  status?: "error" | "success";
+};
 
 export async function updateOrderLifecycleStatusAction(formData: FormData) {
   const orderId = readString(formData, "orderId");
@@ -121,6 +127,82 @@ export async function updateOrderLifecycleStatusAction(formData: FormData) {
   );
 }
 
+export async function checkFraudRiskAction(
+  _state: OrderActionState,
+  formData: FormData,
+): Promise<OrderActionState> {
+  const validation = await validateOrderOperation(formData);
+
+  if ("error" in validation) {
+    return errorState(validation.error);
+  }
+
+  return successState("Fraud check service not connected yet.");
+}
+
+export async function syncPaymentStatusAction(
+  _state: OrderActionState,
+  formData: FormData,
+): Promise<OrderActionState> {
+  const validation = await validateOrderOperation(formData);
+
+  if ("error" in validation) {
+    return errorState(validation.error);
+  }
+
+  return successState("Payment status sync service not connected yet.");
+}
+
+export async function createPathaoShipmentAction(
+  _state: OrderActionState,
+  formData: FormData,
+): Promise<OrderActionState> {
+  const validation = await validateOrderOperation(formData);
+
+  if ("error" in validation) {
+    return errorState(validation.error);
+  }
+
+  return successState("Pathao shipment service not connected yet.");
+}
+
+export async function syncCourierStatusAction(
+  _state: OrderActionState,
+  formData: FormData,
+): Promise<OrderActionState> {
+  const validation = await validateOrderOperation(formData);
+
+  if ("error" in validation) {
+    return errorState(validation.error);
+  }
+
+  return successState("Courier status sync service not connected yet.");
+}
+
+export async function saveOrderAdminNotesAction(
+  _state: OrderActionState,
+  formData: FormData,
+): Promise<OrderActionState> {
+  const validation = await validateOrderOperation(formData);
+
+  if ("error" in validation) {
+    return errorState(validation.error);
+  }
+
+  const adminNotes = readString(formData, "adminNotes").slice(0, 2000) || null;
+
+  await db.order.update({
+    data: {
+      adminNotes,
+    },
+    where: { id: validation.orderId },
+  });
+
+  revalidateOrders(validation.orderId);
+
+  return successState("Internal order notes saved.");
+}
+
 async function getActiveAdminId() {
   let session;
 
@@ -143,6 +225,35 @@ async function getActiveAdminId() {
   });
 
   return admin?.isActive ? admin.id : null;
+}
+
+async function validateOrderOperation(
+  formData: FormData,
+): Promise<OrderOperationValidation> {
+  const orderId = readString(formData, "orderId");
+
+  if (!orderId) {
+    return { error: "Order id is required." };
+  }
+
+  const adminUserId = await getActiveAdminId();
+
+  if (!adminUserId) {
+    return { error: "Admin session is required." };
+  }
+
+  const order = await db.order.findUnique({
+    select: {
+      id: true,
+    },
+    where: { id: orderId },
+  });
+
+  if (!order) {
+    return { error: "Order no longer exists." };
+  }
+
+  return { orderId: order.id };
 }
 
 function getCurrentStatus(
@@ -207,4 +318,18 @@ function revalidateOrders(orderId: string) {
 
 function formatStatusType(statusType: StatusType) {
   return statusType.charAt(0) + statusType.slice(1).toLowerCase();
+}
+
+function successState(message: string): OrderActionState {
+  return {
+    message,
+    status: "success",
+  };
+}
+
+function errorState(message: string): OrderActionState {
+  return {
+    message,
+    status: "error",
+  };
 }

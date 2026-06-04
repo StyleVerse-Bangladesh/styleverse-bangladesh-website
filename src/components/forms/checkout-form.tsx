@@ -18,15 +18,16 @@ import { Input } from "@/components/ui/input";
 import { Price } from "@/components/product/price";
 import { useCartStore } from "@/store/cart-store";
 import type { CartItem } from "@/types/cart";
-import { validateCoupon } from "@/lib/coupons";
 import {
   defaultImagePlaceholders,
   getImageUrl,
 } from "@/lib/constants/assets";
 import { getVariantAvailability } from "@/lib/inventory";
-import { getLineItemTotal } from "@/lib/pricing";
+import { getDeliveryFee, getLineItemTotal } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import { useCartSummary } from "@/hooks/use-cart-summary";
+import type { Coupon } from "@/types/coupon";
+import type { StorefrontSettingsDto } from "@/types/api/settings.dto";
 import { checkoutSchema, type CheckoutValues } from "./schemas";
 
 type CheckoutSectionProps = {
@@ -56,10 +57,16 @@ type SummaryItem = {
   inventoryTone?: "preorder" | "low" | "warning";
 };
 
-export function CheckoutForm() {
+export function CheckoutForm({
+  settings,
+}: {
+  settings: StorefrontSettingsDto;
+}) {
   const cartItems = useCartStore((state) => state.items);
-  const cartSummary = useCartSummary();
   const [couponSubmitError, setCouponSubmitError] = useState("");
+  const deliveryRules = getCheckoutDeliveryRules(settings.delivery);
+  const paymentMethods = settings.paymentMethods;
+  const firstPaymentMethod = paymentMethods.find(isSelectablePaymentMethod);
   const form = useForm<CheckoutValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
@@ -70,13 +77,19 @@ export function CheckoutForm() {
       apartment: "",
       city: "",
       postalCode: "",
-      deliveryMethod: "standard",
-      paymentMethod: "cashOnDelivery",
+      deliveryMethod: deliveryRules[0]?.id ?? "",
+      paymentMethod: firstPaymentMethod?.id ?? "",
     },
   });
   const { errors, isSubmitting } = form.formState;
   const deliveryMethod = form.watch("deliveryMethod");
   const paymentMethod = form.watch("paymentMethod");
+  const city = form.watch("city");
+  const cartSummary = useCartSummary({
+    ...settings.delivery,
+    city,
+    selectedRuleId: deliveryMethod,
+  });
   const summaryItems = mapCartItems(cartItems);
   const {
     subtotal,
@@ -89,11 +102,11 @@ export function CheckoutForm() {
   } = cartSummary;
   const errorCount = Object.keys(errors).length;
 
-  function handlePlaceOrder() {
+  async function handlePlaceOrder() {
     setCouponSubmitError("");
 
     if (appliedCoupon) {
-      const result = validateCoupon(appliedCoupon.code, subtotal);
+      const result = await validateCouponCode(appliedCoupon.code, subtotal);
 
       if (!result.isValid) {
         setCouponSubmitError(
@@ -288,30 +301,33 @@ export function CheckoutForm() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Delivery Method
                 </p>
-                <SelectableCard
-                  checked={deliveryMethod === "standard"}
-                  control={
-                    <input
-                      type="radio"
-                      value="standard"
-                      className="sr-only"
-                      {...form.register("deliveryMethod")}
-                    />
-                  }
-                  icon={<Truck className="h-4 w-4" aria-hidden="true" />}
-                  title="Standard Delivery"
-                  description="Estimated 2-4 business days after confirmation."
-                  meta={<Price price={deliveryFee} className="justify-end" />}
-                />
-                <div className="flex min-w-0 items-start gap-3 rounded-lg border border-dashed bg-muted/30 p-3 text-muted-foreground">
-                  <Truck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">
-                      Express Delivery
-                    </p>
-                    <p className="text-xs leading-5">Coming soon.</p>
-                  </div>
-                </div>
+                {deliveryRules.map((rule) => (
+                  <SelectableCard
+                    checked={deliveryMethod === rule.id}
+                    control={
+                      <input
+                        type="radio"
+                        value={rule.id}
+                        className="sr-only"
+                        {...form.register("deliveryMethod")}
+                      />
+                    }
+                    icon={<Truck className="h-4 w-4" aria-hidden="true" />}
+                    key={rule.id}
+                    title={rule.label}
+                    description={getDeliveryDescription(rule)}
+                    meta={
+                      <Price
+                        price={getDeliveryFee(subtotal, {
+                          ...settings.delivery,
+                          city,
+                          selectedRuleId: rule.id,
+                        })}
+                        className="justify-end"
+                      />
+                    }
+                  />
+                ))}
                 {errors.deliveryMethod ? (
                   <FieldErrorMessage
                     id="checkout-delivery-method-error"
@@ -329,34 +345,30 @@ export function CheckoutForm() {
             description="Choose how you want to pay for this order."
           >
             <div className="grid min-w-0 gap-3">
-              <SelectableCard
-                checked={paymentMethod === "cashOnDelivery"}
-                control={
-                  <input
-                    type="radio"
-                    value="cashOnDelivery"
-                    className="sr-only"
-                    {...form.register("paymentMethod")}
-                  />
-                }
-                icon={<ShoppingBag className="h-4 w-4" aria-hidden="true" />}
-                title="Cash on Delivery"
-                description="Pay in cash when your order arrives."
-                meta="Selected"
-              />
+              {paymentMethods.map((method) => {
+                const selectable = isSelectablePaymentMethod(method);
 
-              <div className="flex min-w-0 items-start gap-3 rounded-lg border border-dashed bg-muted/30 p-3 text-muted-foreground">
-                <CreditCard
-                  className="mt-0.5 h-4 w-4 shrink-0"
-                  aria-hidden="true"
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">
-                    Online Payment
-                  </p>
-                  <p className="text-xs leading-5">Coming soon.</p>
-                </div>
-              </div>
+                return (
+                  <SelectableCard
+                    checked={paymentMethod === method.id}
+                    control={
+                      <input
+                        type="radio"
+                        value={method.id}
+                        className="sr-only"
+                        disabled={!selectable}
+                        {...form.register("paymentMethod")}
+                      />
+                    }
+                    disabled={!selectable}
+                    icon={getPaymentIcon(method.id)}
+                    key={method.id}
+                    title={method.label}
+                    description={getPaymentDescription(method)}
+                    meta={paymentMethod === method.id ? "Selected" : undefined}
+                  />
+                );
+              })}
               {errors.paymentMethod ? (
                 <FieldErrorMessage
                   id="checkout-payment-method-error"
@@ -392,6 +404,38 @@ export function CheckoutForm() {
     </form>
   );
 }
+
+async function validateCouponCode(code: string, subtotal: number) {
+  try {
+    const response = await fetch("/api/coupons/validate", {
+      body: JSON.stringify({ code, subtotal }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      return {
+        error: "Coupon no longer applies to this order.",
+        isValid: false,
+      } satisfies CouponValidationResponse;
+    }
+
+    return (await response.json()) as CouponValidationResponse;
+  } catch {
+    return {
+      error: "Coupon no longer applies to this order.",
+      isValid: false,
+    } satisfies CouponValidationResponse;
+  }
+}
+
+type CouponValidationResponse = {
+  coupon?: Coupon;
+  error?: string;
+  isValid: boolean;
+};
 
 function CheckoutSection({
   icon,
@@ -468,6 +512,7 @@ function FieldErrorMessage({
 function SelectableCard({
   checked,
   control,
+  disabled = false,
   icon,
   title,
   description,
@@ -475,6 +520,7 @@ function SelectableCard({
 }: {
   checked: boolean;
   control: ReactNode;
+  disabled?: boolean;
   icon: ReactNode;
   title: string;
   description: string;
@@ -485,6 +531,8 @@ function SelectableCard({
       className={cn(
         "flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border bg-white p-3 shadow-sm transition-colors",
         checked ? "border-black ring-1 ring-black" : "border-zinc-200",
+        disabled &&
+          "cursor-not-allowed border-dashed bg-muted/30 text-muted-foreground ring-0",
       )}
     >
       {control}
@@ -494,6 +542,7 @@ function SelectableCard({
           checked
             ? "border-black bg-black text-white"
             : "border-zinc-200 bg-zinc-50 text-zinc-600",
+          disabled && "border-zinc-200 bg-zinc-100 text-zinc-400",
         )}
       >
         {icon}
@@ -513,6 +562,58 @@ function SelectableCard({
       ) : null}
     </label>
   );
+}
+
+function getCheckoutDeliveryRules(
+  delivery: StorefrontSettingsDto["delivery"],
+) {
+  const activeRules = delivery.rules.filter((rule) => rule.isActive);
+
+  return activeRules.length ? activeRules : delivery.rules;
+}
+
+function getDeliveryDescription(
+  rule: StorefrontSettingsDto["delivery"]["rules"][number],
+) {
+  if (rule.city) {
+    return `Delivery available for ${rule.city}.`;
+  }
+
+  return "Estimated 2-4 business days after confirmation.";
+}
+
+function isSelectablePaymentMethod(
+  method: StorefrontSettingsDto["paymentMethods"][number],
+) {
+  return method.isActive && !method.isComingSoon;
+}
+
+function getPaymentDescription(
+  method: StorefrontSettingsDto["paymentMethods"][number],
+) {
+  if (!method.isActive) {
+    return "Currently unavailable.";
+  }
+
+  if (method.isComingSoon) {
+    return "Coming soon.";
+  }
+
+  if (method.id === "cash_on_delivery") {
+    return "Pay in cash when your order arrives.";
+  }
+
+  return "Pay online during checkout.";
+}
+
+function getPaymentIcon(
+  id: StorefrontSettingsDto["paymentMethods"][number]["id"],
+) {
+  if (id === "cash_on_delivery") {
+    return <ShoppingBag className="h-4 w-4" aria-hidden="true" />;
+  }
+
+  return <CreditCard className="h-4 w-4" aria-hidden="true" />;
 }
 
 function OrderSummary({

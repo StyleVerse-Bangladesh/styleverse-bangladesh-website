@@ -1,7 +1,10 @@
 import "dotenv/config";
 import {
+  CouponType,
+  HomepageSectionType,
   InventoryStatus,
   PaymentMethodCode,
+  Prisma,
   PrismaClient,
   ProductGender,
   ProductStatus,
@@ -11,6 +14,7 @@ import {
 } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "../lib/auth/password";
+import { coupons as staticCoupons } from "../src/data/coupons";
 import productData from "../src/data/products.json";
 import {
   getCategoryById,
@@ -233,6 +237,8 @@ async function main() {
 
   const categoryCount = await seedStorefrontCategories();
   const productStats = await seedStorefrontProducts();
+  const homepageStats = await seedHomepageCmsContent();
+  const couponCount = await seedCoupons();
 
   console.log(
     [
@@ -240,6 +246,8 @@ async function main() {
       `Imported ${productStats.products} products, ${productStats.images} images,`,
       `${productStats.variants} variants, ${productStats.productCategoryLinks} category links,`,
       `and ${productStats.preorders} preorder settings.`,
+      `Seeded ${homepageStats.sections} homepage sections and ${homepageStats.items} homepage items.`,
+      `Seeded ${couponCount} coupons.`,
     ].join(" "),
   );
 }
@@ -644,6 +652,18 @@ function formatRequiredDecimal(value: number) {
   return value.toFixed(2);
 }
 
+function mapCouponType(value: string) {
+  if (value === "percentage") {
+    return CouponType.PERCENTAGE;
+  }
+
+  if (value === "fixed") {
+    return CouponType.FIXED;
+  }
+
+  return CouponType.FREE_SHIPPING;
+}
+
 function parseDate(value: string | undefined) {
   if (!value) {
     return null;
@@ -658,6 +678,411 @@ function parseDateTime(value: string | null | undefined) {
   }
 
   return new Date(value);
+}
+
+async function seedHomepageCmsContent() {
+  const productsBySlug = await getHomepageProductsBySlug();
+  const categoriesByPathKey = await getHomepageCategoriesByPathKey();
+  const sections = getHomepageSectionSeeds();
+  let itemCount = 0;
+
+  for (const section of sections) {
+    await prisma.homepageSection.upsert({
+      where: { id: section.id },
+      update: {
+        isActive: section.isActive,
+        settings: section.settings,
+        sortOrder: section.sortOrder,
+        subtitle: section.subtitle,
+        title: section.title,
+        type: section.type,
+      },
+      create: {
+        id: section.id,
+        isActive: section.isActive,
+        settings: section.settings,
+        sortOrder: section.sortOrder,
+        subtitle: section.subtitle,
+        title: section.title,
+        type: section.type,
+      },
+    });
+
+    for (const item of section.items) {
+      const productId = item.productSlug
+        ? productsBySlug.get(item.productSlug)?.id ?? null
+        : null;
+      const categoryId = item.categoryPathKey
+        ? categoriesByPathKey.get(item.categoryPathKey)?.id ?? null
+        : null;
+
+      await prisma.homepageSectionItem.upsert({
+        where: { id: item.id },
+        update: {
+          alt: item.alt ?? null,
+          categoryId,
+          href: item.href ?? null,
+          image: item.image ?? null,
+          metadata: item.metadata ?? Prisma.JsonNull,
+          productId,
+          sectionId: section.id,
+          sortOrder: item.sortOrder,
+          subtitle: item.subtitle ?? null,
+          title: item.title ?? null,
+        },
+        create: {
+          id: item.id,
+          alt: item.alt ?? null,
+          categoryId,
+          href: item.href ?? null,
+          image: item.image ?? null,
+          metadata: item.metadata ?? Prisma.JsonNull,
+          productId,
+          sectionId: section.id,
+          sortOrder: item.sortOrder,
+          subtitle: item.subtitle ?? null,
+          title: item.title ?? null,
+        },
+      });
+      itemCount += 1;
+    }
+  }
+
+  return {
+    items: itemCount,
+    sections: sections.length,
+  };
+}
+
+async function seedCoupons() {
+  for (const coupon of staticCoupons) {
+    const minimumOrder =
+      coupon.minimumOrder === undefined
+        ? null
+        : formatRequiredDecimal(coupon.minimumOrder);
+    const validUntil = coupon.validUntil
+      ? new Date(`${coupon.validUntil}T23:59:59.999Z`)
+      : null;
+    const data = {
+      isActive: coupon.isActive,
+      maxUses: coupon.maxUses ?? null,
+      maxUsesPerCustomer: coupon.maxUsesPerCustomer ?? null,
+      minimumOrder,
+      type: mapCouponType(coupon.type),
+      validUntil,
+      value: formatRequiredDecimal(coupon.value),
+    };
+
+    await prisma.coupon.upsert({
+      where: { code: coupon.code.toUpperCase() },
+      update: data,
+      create: {
+        ...data,
+        code: coupon.code.toUpperCase(),
+      },
+    });
+  }
+
+  return staticCoupons.length;
+}
+
+async function getHomepageProductsBySlug() {
+  const products = await prisma.product.findMany({
+    select: {
+      id: true,
+      slug: true,
+    },
+  });
+
+  return new Map(products.map((product) => [product.slug, product]));
+}
+
+async function getHomepageCategoriesByPathKey() {
+  const categories = await prisma.category.findMany({
+    select: {
+      id: true,
+      pathKey: true,
+    },
+  });
+
+  return new Map(categories.map((category) => [category.pathKey, category]));
+}
+
+type HomepageSectionSeed = {
+  id: string;
+  isActive: boolean;
+  items: HomepageItemSeed[];
+  settings: Prisma.InputJsonObject;
+  sortOrder: number;
+  subtitle: string | null;
+  title: string;
+  type: HomepageSectionType;
+};
+
+type HomepageItemSeed = {
+  alt?: string;
+  categoryPathKey?: string;
+  href?: string;
+  id: string;
+  image?: string;
+  metadata?: Prisma.InputJsonObject;
+  productSlug?: string;
+  sortOrder: number;
+  subtitle?: string;
+  title?: string;
+};
+
+function getHomepageSectionSeeds(): HomepageSectionSeed[] {
+  return [
+    {
+      id: "00000000-0000-0000-0000-000000000101",
+      type: HomepageSectionType.HERO,
+      title: "Hero",
+      subtitle: null,
+      sortOrder: 0,
+      isActive: true,
+      settings: { seededBy: "default-homepage-cms" },
+      items: [1, 2, 3, 4, 5].map((index) => ({
+        id: `00000000-0000-0000-0001-${String(index).padStart(12, "0")}`,
+        title: `Hero Banner ${index}`,
+        image: `/images/hero/hero-${index}.webp`,
+        alt: `StyleVerse Bangladesh hero banner ${index}`,
+        href: "#",
+        sortOrder: index - 1,
+        metadata: {
+          height: 690,
+          width: 1920,
+        },
+      })),
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000102",
+      type: HomepageSectionType.FEATURE_STRIP,
+      title: "Feature Strip",
+      subtitle: null,
+      sortOrder: 1,
+      isActive: true,
+      settings: { seededBy: "default-homepage-cms" },
+      items: [
+        featureSeed(1, "Premium Quality Products", "check", 0),
+        featureSeed(2, "Fastest Shipping Countrywide", "truck", 1),
+        featureSeed(3, "Easy Exchange Policy", "refresh", 2),
+        featureSeed(4, "Online Support 24/7", "headphones", 3),
+      ],
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000103",
+      type: HomepageSectionType.CATEGORY_GROUP,
+      title: "SHOP BY CATEGORY",
+      subtitle: null,
+      sortOrder: 2,
+      isActive: true,
+      settings: { seededBy: "default-homepage-cms" },
+      items: categoryHomepageSeeds(),
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000104",
+      type: HomepageSectionType.NEW_ARRIVALS,
+      title: "New Arrival Products",
+      subtitle: null,
+      sortOrder: 3,
+      isActive: true,
+      settings: { seededBy: "default-homepage-cms" },
+      items: newArrivalHomepageSeeds(),
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000105",
+      type: HomepageSectionType.RECOMMENDED_PRODUCTS,
+      title: "Product You May Like",
+      subtitle: null,
+      sortOrder: 4,
+      isActive: true,
+      settings: { seededBy: "default-homepage-cms" },
+      items: storefrontProducts.map((product, index) => ({
+        id: `00000000-0000-0000-0005-${String(index + 1).padStart(12, "0")}`,
+        productSlug: product.slug,
+        sortOrder: index,
+        title: product.name,
+      })),
+    },
+  ];
+}
+
+function featureSeed(
+  index: number,
+  title: string,
+  icon: string,
+  sortOrder: number,
+): HomepageItemSeed {
+  return {
+    id: `00000000-0000-0000-0002-${String(index).padStart(12, "0")}`,
+    title,
+    sortOrder,
+    metadata: { icon },
+  };
+}
+
+function categoryHomepageSeeds(): HomepageItemSeed[] {
+  const groups = [
+    {
+      title: "Men Essentials",
+      sortOrder: 0,
+      items: [
+        categorySeed("T-Shirts", "/men/t-shirts", "from-zinc-950 to-zinc-600", "men/t-shirts"),
+        categorySeed("Polo", "/men/polo-t-shirts", "from-neutral-700 to-stone-300", "men/polo-t-shirts"),
+        categorySeed("Shirts", "/men/shirts", "from-slate-900 to-slate-500", "men/shirts"),
+        categorySeed("Joggers", "/men/joggers", "from-stone-800 to-zinc-400", "men/joggers"),
+      ],
+    },
+    {
+      title: "Women Collection",
+      sortOrder: 1,
+      items: [
+        categorySeed("Dresses", "/women", "from-zinc-900 to-rose-200", "women/dresses"),
+        categorySeed("Tops", "/women", "from-neutral-800 to-zinc-300", "women/tops"),
+        categorySeed("Co-Ord Set", "/women", "from-stone-900 to-stone-300", "women/co-ord-set"),
+        categorySeed("Outerwear", "/women", "from-slate-950 to-slate-400", "women/outerwear"),
+      ],
+    },
+    {
+      title: "Kids",
+      sortOrder: 2,
+      items: [
+        categorySeed("T-Shirts", "/kids", "from-black to-zinc-500", "kids/t-shirts"),
+        categorySeed("Sets", "/kids", "from-zinc-900 to-neutral-300", "kids/sets"),
+        categorySeed("Shoes", "/kids", "from-slate-900 to-slate-400", "kids/shoes"),
+        categorySeed("Accessories", "/kids", "from-stone-800 to-stone-300", "kids/accessories"),
+      ],
+    },
+    {
+      title: "Accessories",
+      sortOrder: 3,
+      items: [
+        categorySeed("Bags", "/accessories", "from-neutral-950 to-neutral-500", "accessories/bags"),
+        categorySeed("Caps", "/accessories", "from-zinc-800 to-zinc-300", "accessories/caps"),
+        categorySeed("Belts", "/accessories", "from-stone-950 to-stone-500", "accessories/belts"),
+        categorySeed("Sunglasses", "/accessories", "from-slate-900 to-zinc-300", "accessories/sunglasses"),
+      ],
+    },
+  ];
+
+  return groups.flatMap((group) =>
+    group.items.map((item, itemIndex) => ({
+      ...item,
+      id: `00000000-0000-0000-0003-${String(group.sortOrder * 10 + itemIndex + 1).padStart(12, "0")}`,
+      metadata: {
+        groupSortOrder: group.sortOrder,
+        groupTitle: group.title,
+        tone: item.metadata?.tone,
+      },
+      sortOrder: group.sortOrder * 10 + itemIndex,
+    })),
+  );
+}
+
+function categorySeed(
+  title: string,
+  href: string,
+  tone: string,
+  categoryPathKey: string,
+): Omit<HomepageItemSeed, "id"> {
+  return {
+    categoryPathKey,
+    href,
+    metadata: { tone },
+    sortOrder: 0,
+    title,
+  };
+}
+
+function newArrivalHomepageSeeds(): HomepageItemSeed[] {
+  return [
+    newArrivalSeed(
+      1,
+      "structured-cotton-shirt",
+      "Half Sleeve Printed Casual Shirt For Men",
+      "/images/products/half-sleeve-printed-casual-shirt-black.webp",
+      990,
+      1490,
+      "/products/structured-cotton-shirt",
+      "svb-001",
+    ),
+    newArrivalSeed(
+      2,
+      "structured-cotton-shirt",
+      "Half Sleeve Printed Casual Shirt For Men",
+      "/images/products/half-sleeve-printed-casual-shirt-white.webp",
+      990,
+      1490,
+      "/products/structured-cotton-shirt",
+      "svb-001",
+    ),
+    newArrivalSeed(
+      3,
+      "relaxed-linen-dress",
+      "Premium Knitted Polo Shirt For Men",
+      "/images/products/premium-knitted-polo-shirt-black.webp",
+      1190,
+      1500,
+      "/products/relaxed-linen-dress",
+      "svb-002",
+    ),
+    newArrivalSeed(
+      4,
+      "performance-knit-sneaker",
+      "Premium Knitted Polo Shirt For Men",
+      "/images/products/premium-knitted-polo-shirt-cream.webp",
+      1190,
+      1500,
+      "/products/performance-knit-sneaker",
+      "svb-004",
+    ),
+    newArrivalSeed(
+      5,
+      "kids-everyday-hoodie",
+      "Premium Knit Casual Polo",
+      "/images/products/premium-knit-casual-polo-olive.webp",
+      1190,
+      1500,
+      "/products/kids-everyday-hoodie",
+      "svb-003",
+    ),
+    newArrivalSeed(
+      6,
+      "structured-cotton-shirt",
+      "Relaxed Everyday Fashion Shirt",
+      "/images/products/relaxed-everyday-fashion-shirt-sand.webp",
+      1290,
+      1690,
+      "/products/structured-cotton-shirt",
+      "svb-001",
+    ),
+  ];
+}
+
+function newArrivalSeed(
+  index: number,
+  productSlug: string,
+  title: string,
+  image: string,
+  price: number,
+  compareAtPrice: number,
+  href: string,
+  wishlistId: string,
+): HomepageItemSeed {
+  return {
+    id: `00000000-0000-0000-0004-${String(index).padStart(12, "0")}`,
+    productSlug,
+    title,
+    image,
+    href,
+    sortOrder: index - 1,
+    metadata: {
+      compareAtPrice,
+      price,
+      wishlistId,
+    },
+  };
 }
 
 async function grantPermissions(

@@ -24,9 +24,14 @@ import { useCartStore } from "@/store/cart-store";
 import { useUiStore } from "@/store/ui-store";
 import { useCartSummary } from "@/hooks/use-cart-summary";
 import type { CartItem } from "@/types/cart";
+import type { StorefrontSettingsDto } from "@/types/api/settings.dto";
 import type { ProductVariant } from "@/types/product";
 
-export function MobileCartDrawer() {
+export function MobileCartDrawer({
+  deliverySettings,
+}: {
+  deliverySettings: StorefrontSettingsDto["delivery"];
+}) {
   const open = useUiStore((state) => state.isMobileCartDrawerOpen);
   const setOpen = useUiStore((state) => state.setMobileCartDrawerOpen);
   const items = useCartStore((state) => state.items);
@@ -38,7 +43,7 @@ export function MobileCartDrawer() {
     shippingDiscount,
     total,
     appliedCoupon,
-  } = useCartSummary();
+  } = useCartSummary(deliverySettings);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 768px)");

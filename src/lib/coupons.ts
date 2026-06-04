@@ -60,6 +60,37 @@ export function validateCoupon(
   };
 }
 
+export function validateCouponSnapshot(
+  coupon: Coupon,
+  subtotal: number,
+): CouponValidationResult {
+  if (!coupon.isActive) {
+    return {
+      isValid: false,
+      error: "Coupon is not active.",
+    };
+  }
+
+  if (isCouponExpired(coupon)) {
+    return {
+      isValid: false,
+      error: "Coupon has expired.",
+    };
+  }
+
+  if (coupon.minimumOrder && subtotal < coupon.minimumOrder) {
+    return {
+      isValid: false,
+      error: `Minimum order is ${coupon.minimumOrder}.`,
+    };
+  }
+
+  return {
+    isValid: true,
+    coupon,
+  };
+}
+
 export function getCouponDiscount(
   coupon: CouponDiscountInput,
   subtotal: number,

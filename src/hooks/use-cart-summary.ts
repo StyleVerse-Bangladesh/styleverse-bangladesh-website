@@ -1,14 +1,24 @@
 import { useCartStore } from "@/store/cart-store";
-import { applyCouponToPricing, validateCoupon } from "@/lib/coupons";
-import { getOrderPricing } from "@/lib/pricing";
+import { applyCouponToPricing, validateCouponSnapshot } from "@/lib/coupons";
+import {
+  getOrderPricing,
+  type DeliveryPricingOptions,
+} from "@/lib/pricing";
 
-export function useCartSummary() {
+export function useCartSummary(deliveryOptions?: DeliveryPricingOptions) {
   const items = useCartStore((state) => state.items);
   const appliedCoupon = useCartStore((state) => state.appliedCoupon);
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
-  const pricing = getOrderPricing(items);
+  const pricing = getOrderPricing(items, deliveryOptions);
   const couponValidation = appliedCoupon
-    ? validateCoupon(appliedCoupon.code, pricing.subtotal)
+    ? validateCouponSnapshot(
+        {
+          ...appliedCoupon,
+          id: appliedCoupon.couponId,
+          isActive: true,
+        },
+        pricing.subtotal,
+      )
     : undefined;
   const isCouponApplicable = Boolean(couponValidation?.isValid);
   const couponPricing =

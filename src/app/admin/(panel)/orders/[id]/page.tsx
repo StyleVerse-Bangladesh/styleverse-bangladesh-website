@@ -7,10 +7,13 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  FileText,
   MapPin,
+  NotebookText,
   Package,
   ReceiptText,
   Save,
+  ShieldAlert,
   Truck,
   UserRound,
   type LucideIcon,
@@ -22,6 +25,12 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { updateOrderLifecycleStatusAction } from "@/app/admin/(panel)/orders/actions";
+import {
+  CourierActionGroup,
+  FraudRiskCheckForm,
+  OrderAdminNotesForm,
+  PaymentSyncForm,
+} from "@/app/admin/(panel)/orders/order-operational-controls";
 import { cn } from "@/lib/utils";
 import { db } from "@/lib/db";
 
@@ -93,17 +102,32 @@ export default async function AdminOrderDetailsPage({
   const deliveryMethod =
     deliveryRuleLabels.get(order.deliveryMethod) ??
     formatFreeText(order.deliveryMethod);
+  const latestTransactionId =
+    order.paymentEvents.find((event) => event.transactionId)?.transactionId ??
+    null;
+  const latestTrackingNumber =
+    order.deliveryEvents.find((event) => event.trackingNumber)?.trackingNumber ??
+    null;
 
   return (
     <div className="grid gap-6">
       <header className="grid gap-4">
-        <Link
-          className="inline-flex w-fit min-h-10 items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 shadow-sm shadow-black/5 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950"
-          href="/admin/orders"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Orders
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            className="inline-flex w-fit min-h-10 items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 shadow-sm shadow-black/5 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950"
+            href="/admin/orders"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Orders
+          </Link>
+          <Link
+            className="inline-flex w-fit min-h-10 items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 shadow-sm shadow-black/5 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950"
+            href={`/admin/orders/${order.id}/invoice`}
+          >
+            <FileText className="h-4 w-4" aria-hidden="true" />
+            Invoice
+          </Link>
+        </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-sky-700">Order Details</p>
@@ -241,32 +265,66 @@ export default async function AdminOrderDetailsPage({
             </dl>
           </InfoCard>
 
-          <InfoCard icon={CreditCard} title="Payment Info">
+          <InfoCard icon={ShieldAlert} title="Fraud / Risk Check">
+            <div className="grid gap-4">
+              <dl className="grid gap-3 text-sm">
+                <InfoPair label="Customer Phone">{order.customerPhone}</InfoPair>
+                <InfoPair label="Risk Status">
+                  <PlaceholderBadge>Not Checked</PlaceholderBadge>
+                </InfoPair>
+              </dl>
+              <dl className="grid gap-2 sm:grid-cols-2">
+                <MetricPlaceholder label="Total Previous Orders" />
+                <MetricPlaceholder label="Delivered" />
+                <MetricPlaceholder label="Cancelled" />
+                <MetricPlaceholder label="Returned" />
+                <MetricPlaceholder label="Success Rate" />
+              </dl>
+              <FraudRiskCheckForm orderId={order.id} />
+            </div>
+          </InfoCard>
+
+          <InfoCard icon={CreditCard} title="Payment Panel">
             <dl className="grid gap-3 text-sm">
               <InfoPair label="Method">{paymentMethod}</InfoPair>
               <InfoPair label="Status">
                 <StatusBadge status={order.paymentStatus} />
               </InfoPair>
-              <InfoPair label="Events">
-                {order.paymentEvents.length
-                  ? `${order.paymentEvents.length} events`
-                  : "No payment events"}
+              <InfoPair label="Transaction ID">
+                {latestTransactionId || <MutedText>Not stored yet</MutedText>}
+              </InfoPair>
+              <InfoPair label="Future Gateway Status">
+                <PlaceholderBadge>Not Connected</PlaceholderBadge>
               </InfoPair>
             </dl>
+            <div className="mt-4">
+              <PaymentSyncForm orderId={order.id} />
+            </div>
           </InfoCard>
 
-          <InfoCard icon={Truck} title="Delivery Info">
+          <InfoCard icon={Truck} title="Courier / Pathao Panel">
             <dl className="grid gap-3 text-sm">
-              <InfoPair label="Method">{deliveryMethod}</InfoPair>
-              <InfoPair label="Status">
+              <InfoPair label="Delivery Method">{deliveryMethod}</InfoPair>
+              <InfoPair label="Delivery Status">
                 <StatusBadge status={order.deliveryStatus} />
               </InfoPair>
-              <InfoPair label="Events">
-                {order.deliveryEvents.length
-                  ? `${order.deliveryEvents.length} events`
-                  : "No delivery events"}
+              <InfoPair label="Courier Provider">
+                Pathao <MutedText>placeholder</MutedText>
+              </InfoPair>
+              <InfoPair label="Tracking Number">
+                {latestTrackingNumber || <MutedText>Not stored yet</MutedText>}
               </InfoPair>
             </dl>
+            <div className="mt-4">
+              <CourierActionGroup orderId={order.id} />
+            </div>
+          </InfoCard>
+
+          <InfoCard icon={NotebookText} title="Internal Order Notes">
+            <OrderAdminNotesForm
+              adminNotes={order.adminNotes}
+              orderId={order.id}
+            />
           </InfoCard>
 
           <InfoCard icon={Save} title="Status Management">
@@ -345,6 +403,7 @@ async function getOrder(orderId: string) {
     where: { id: orderId },
     select: {
       addressSnapshot: true,
+      adminNotes: true,
       coupon: {
         select: {
           code: true,
@@ -653,6 +712,23 @@ function MetaPill({ children }: { children: ReactNode }) {
     <span className="inline-flex h-7 items-center rounded-md border border-zinc-200 bg-white px-2 text-xs font-semibold text-zinc-600">
       {children}
     </span>
+  );
+}
+
+function PlaceholderBadge({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex h-7 w-fit items-center rounded-md border border-zinc-200 bg-zinc-50 px-2 text-xs font-semibold text-zinc-600">
+      {children}
+    </span>
+  );
+}
+
+function MetricPlaceholder({ label }: { label: string }) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+      <dt className="text-xs font-semibold uppercase text-zinc-500">{label}</dt>
+      <dd className="mt-1 text-sm font-black text-zinc-950">Not checked</dd>
+    </div>
   );
 }
 

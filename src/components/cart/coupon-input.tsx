@@ -3,10 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { validateCoupon } from "@/lib/coupons";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/store/cart-store";
 import { useCartSummary } from "@/hooks/use-cart-summary";
+import type { Coupon } from "@/types/coupon";
 
 type CouponInputProps = {
   className?: string;
@@ -21,6 +21,7 @@ export function CouponInput({ className }: CouponInputProps) {
     appliedCoupon ? `${appliedCoupon.code} applied.` : "",
   );
   const [error, setError] = useState("");
+  const [isApplying, setIsApplying] = useState(false);
 
   useEffect(() => {
     if (!appliedCoupon) {
@@ -32,15 +33,17 @@ export function CouponInput({ className }: CouponInputProps) {
     setError("");
   }, [appliedCoupon]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const normalizedCode = code.trim().toUpperCase();
     setCode(normalizedCode);
     setMessage("");
     setError("");
+    setIsApplying(true);
 
-    const result = validateCoupon(normalizedCode, subtotal);
+    const result = await validateCouponCode(normalizedCode, subtotal);
+    setIsApplying(false);
 
     if (!result.isValid || !result.coupon) {
       setError(result.error ?? "Coupon could not be applied.");
@@ -53,6 +56,7 @@ export function CouponInput({ className }: CouponInputProps) {
       type: result.coupon.type,
       value: result.coupon.value,
       minimumOrder: result.coupon.minimumOrder,
+      validUntil: result.coupon.validUntil,
     });
     setMessage(`${result.coupon.code} applied.`);
   }
@@ -86,9 +90,9 @@ export function CouponInput({ className }: CouponInputProps) {
         <Button
           type="submit"
           className="h-10 min-h-10 shrink-0 px-3"
-          disabled={!code.trim()}
+          disabled={!code.trim() || isApplying}
         >
-          Apply
+          {isApplying ? "Applying" : "Apply"}
         </Button>
       </form>
 
@@ -115,3 +119,35 @@ export function CouponInput({ className }: CouponInputProps) {
     </div>
   );
 }
+
+async function validateCouponCode(code: string, subtotal: number) {
+  try {
+    const response = await fetch("/api/coupons/validate", {
+      body: JSON.stringify({ code, subtotal }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      return {
+        error: "Coupon could not be applied.",
+        isValid: false,
+      } satisfies CouponValidationResponse;
+    }
+
+    return (await response.json()) as CouponValidationResponse;
+  } catch {
+    return {
+      error: "Coupon could not be applied.",
+      isValid: false,
+    } satisfies CouponValidationResponse;
+  }
+}
+
+type CouponValidationResponse = {
+  coupon?: Coupon;
+  error?: string;
+  isValid: boolean;
+};

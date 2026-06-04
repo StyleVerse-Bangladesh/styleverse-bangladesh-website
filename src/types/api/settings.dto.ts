@@ -22,12 +22,23 @@ export type StorefrontSettingsDto = {
   delivery: {
     defaultFee: number;
     freeShippingMinimum?: number;
+    rules: Array<{
+      id: string;
+      deliveryMethod: string;
+      label: string;
+      defaultFee: number;
+      freeShippingMinimum?: number;
+      city?: string;
+      isActive: boolean;
+      sortOrder: number;
+    }>;
   };
   paymentMethods: Array<{
     id: "cash_on_delivery" | "online_payment";
     label: string;
     isActive: boolean;
     isComingSoon?: boolean;
+    sortOrder: number;
   }>;
   pwa: {
     name: string;

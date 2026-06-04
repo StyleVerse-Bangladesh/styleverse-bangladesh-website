@@ -13,4 +13,5 @@ export type AppliedCoupon = {
   type: CouponType;
   value: number;
   minimumOrder?: number;
+  validUntil?: string;
 };

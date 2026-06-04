@@ -69,6 +69,11 @@ enum DeliveryStatus {
   RETURNED
 }
 
+enum InvoiceStatus {
+  ISSUED
+  VOID
+}
+
 enum PaymentMethodCode {
   CASH_ON_DELIVERY
   ONLINE_PAYMENT
@@ -437,6 +442,7 @@ model Order {
   deliveryMethod      String         @map("delivery_method")
   deliveryStatus      DeliveryStatus @default(PENDING) @map("delivery_status")
   orderStatus         OrderStatus    @default(PENDING) @map("order_status")
+  adminNotes          String?        @map("admin_notes")
   createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -447,6 +453,7 @@ model Order {
   paymentEvents     PaymentEvent[]
   deliveryEvents    DeliveryEvent[]
   couponRedemptions CouponRedemption[]
+  invoice           Invoice?
 
   @@index([customerId])
   @@index([orderStatus])
@@ -454,6 +461,33 @@ model Order {
   @@index([deliveryStatus])
   @@index([createdAt])
   @@map("orders")
+}
+
+model Invoice {
+  id                       String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId                  String        @unique @map("order_id") @db.Uuid
+  customerId               String?       @map("customer_id") @db.Uuid
+  invoiceNumber            String        @unique @map("invoice_number")
+  invoiceStatus            InvoiceStatus @default(ISSUED) @map("invoice_status")
+  subtotalSnapshot         Decimal       @map("subtotal_snapshot") @db.Decimal(12, 2)
+  deliveryFeeSnapshot      Decimal       @map("delivery_fee_snapshot") @db.Decimal(12, 2)
+  couponDiscountSnapshot   Decimal       @map("coupon_discount_snapshot") @db.Decimal(12, 2)
+  shippingDiscountSnapshot Decimal       @map("shipping_discount_snapshot") @db.Decimal(12, 2)
+  grandTotalSnapshot       Decimal       @map("grand_total_snapshot") @db.Decimal(12, 2)
+  customerSnapshot         Json          @map("customer_snapshot")
+  addressSnapshot          Json          @map("address_snapshot")
+  itemsSnapshot            Json          @map("items_snapshot")
+  generatedAt              DateTime      @default(now()) @map("generated_at") @db.Timestamptz(6)
+  createdAt                DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([invoiceStatus])
+  @@index([generatedAt])
+  @@map("invoices")
 }
 
 model OrderItem {
@@ -547,6 +581,7 @@ model Customer {
   email       String?   @unique
   phone       String?   @unique
   isActive    Boolean   @default(true) @map("is_active")
+  adminNotes  String?   @map("admin_notes")
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -554,6 +589,7 @@ model Customer {
   addresses   CustomerAddress[]
   wishlist    Wishlist?
   orders      Order[]
+  invoices    Invoice[]
   redemptions CouponRedemption[]
 
   @@index([isActive])

@@ -6,19 +6,21 @@ import { MobileBottomNav } from "@/components/navigation/mobile-bottom-nav";
 import { MobileCategoryDrawer } from "@/components/navigation/mobile-category-drawer";
 import { MobileSearchDropdown } from "@/components/search/mobile-search-dropdown";
 import { MobileWishlistDrawer } from "@/components/wishlist/mobile-wishlist-drawer";
+import type { StorefrontSettingsDto } from "@/types/api/settings.dto";
 
 type SiteShellProps = {
   children: React.ReactNode;
+  settings: StorefrontSettingsDto;
 };
 
-export function SiteShell({ children }: SiteShellProps) {
+export function SiteShell({ children, settings }: SiteShellProps) {
   return (
     <div className="flex min-h-screen flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
-      <Header />
+      <Header settings={settings} />
       <main className="flex-1">{children}</main>
-      <Footer />
+      <Footer settings={settings} />
       <MobileCategoryDrawer />
-      <MobileCartDrawer />
+      <MobileCartDrawer deliverySettings={settings.delivery} />
       <MobileWishlistDrawer />
       <MobileAuthModal />
       <MobileSearchDropdown />

@@ -1,10 +1,10 @@
 import type { SVGProps } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Clock, Mail, Phone } from "lucide-react";
+import { Clock, Mail, MapPin, Phone } from "lucide-react";
 import { siteContainerClassName } from "@/lib/constants/layout";
-import { siteConfig } from "@/lib/constants/site";
 import { cn } from "@/lib/utils";
+import type { StorefrontSettingsDto } from "@/types/api/settings.dto";
 
 const informationLinks = [
   { label: "About StyleVerse", href: "/about" },
@@ -20,7 +20,7 @@ const contactLines = {
   phone: "+880 1511937953",
 };
 
-const socialLinks = [
+const fallbackSocialLinks = [
   {
     label: "Instagram",
     href: "https://www.instagram.com/styleverse.bangladesh/",
@@ -59,6 +59,7 @@ type FacebookPagePreviewData = {
 
 type FooterProps = {
   facebookPreview?: FacebookPagePreviewData;
+  settings: StorefrontSettingsDto;
 };
 
 // Frontend-static placeholder for now. Later this should be hydrated from a
@@ -75,9 +76,20 @@ const defaultFacebookPagePreview: FacebookPagePreviewData = {
 const footerLinkUnderline =
   "relative inline-block after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:origin-left after:scale-x-0 after:bg-[#C8C8C8] after:transition-transform after:duration-200 after:ease-out group-hover:after:scale-x-100 group-focus-visible:after:scale-x-100";
 
-export function Footer({
-  facebookPreview = defaultFacebookPagePreview,
-}: FooterProps = {}) {
+export function Footer({ facebookPreview, settings }: FooterProps) {
+  const contactEmails = settings.contact.email
+    ? [settings.contact.email]
+    : [contactLines.primaryEmail, contactLines.secondaryEmail];
+  const contactPhone = settings.contact.phone || contactLines.phone;
+  const footerSocialLinks = getFooterSocialLinks(settings);
+  const facebookPagePreview = facebookPreview ?? {
+    ...defaultFacebookPagePreview,
+    name: settings.storeName,
+    pageUrl:
+      footerSocialLinks.find((link) => link.label === "Facebook")?.href ??
+      defaultFacebookPagePreview.pageUrl,
+  };
+
   return (
     <footer className="relative overflow-hidden bg-black text-white">
       <div className="pointer-events-none absolute inset-0 opacity-[0.09]">
@@ -98,19 +110,20 @@ export function Footer({
         <div className="min-w-0 lg:self-center">
           <Link
             href="/"
-            aria-label={`${siteConfig.name} home`}
+            aria-label={`${settings.storeName} home`}
             className="inline-flex flex-col items-center"
           >
             <Image
-              src="/logo/StyleVerse-Logo-Long-White.png"
-              alt={siteConfig.name}
+              src={settings.logo.footer}
+              alt={settings.storeName}
               width={3000}
               height={436}
               className="h-auto w-32 drop-shadow-sm xs:w-40 sm:w-52 lg:w-64"
               priority={false}
+              unoptimized={isExternalImage(settings.logo.footer)}
             />
             <span className="mt-1.5 w-32 text-center text-[9px] font-semibold uppercase leading-4 tracking-[0.18em] text-white/70 xs:w-40 sm:w-52 sm:text-[10px] sm:tracking-[0.24em] lg:mt-2 lg:w-64 lg:text-[11px]">
-              {siteConfig.name}
+              {settings.storeName}
             </span>
           </Link>
 
@@ -144,37 +157,35 @@ export function Footer({
           </h2>
           <div className="mt-3 space-y-3 text-[11px] leading-5 text-white sm:mt-4 sm:text-xs lg:mt-5 lg:space-y-3">
             <div className="space-y-2.5 lg:space-y-3">
-              <a
-                href={`mailto:${contactLines.primaryEmail}`}
-                className="group flex min-h-7 min-w-0 items-start gap-2 break-words transition-colors hover:text-[#C8C8C8]"
-              >
-                <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C8C8C8] lg:h-4 lg:w-4" />
-                <span className="min-w-0 [overflow-wrap:anywhere]">
-                  <span className={footerLinkUnderline}>
-                    {contactLines.primaryEmail}
+              {contactEmails.map((email) => (
+                <a
+                  href={`mailto:${email}`}
+                  className="group flex min-h-7 min-w-0 items-start gap-2 break-words transition-colors hover:text-[#C8C8C8]"
+                  key={email}
+                >
+                  <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C8C8C8] lg:h-4 lg:w-4" />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    <span className={footerLinkUnderline}>{email}</span>
                   </span>
-                </span>
-              </a>
-              <a
-                href={`mailto:${contactLines.secondaryEmail}`}
-                className="group flex min-h-7 min-w-0 items-start gap-2 break-words transition-colors hover:text-[#C8C8C8]"
-              >
-                <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C8C8C8] lg:h-4 lg:w-4" />
-                <span className="min-w-0 [overflow-wrap:anywhere]">
-                  <span className={footerLinkUnderline}>
-                    {contactLines.secondaryEmail}
+                </a>
+              ))}
+              {settings.contact.address ? (
+                <p className="flex min-h-7 min-w-0 items-start gap-2 break-words">
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C8C8C8] lg:h-4 lg:w-4" />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    {settings.contact.address}
                   </span>
-                </span>
-              </a>
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap gap-x-4 gap-y-2 font-medium lg:gap-x-5">
               <a
-                href={`tel:${contactLines.phone.replace(/\s+/g, "")}`}
+                href={`tel:${contactPhone.replace(/\s+/g, "")}`}
                 className="group flex min-h-7 items-center gap-2 transition-colors hover:text-[#C8C8C8]"
               >
                 <Phone className="h-3.5 w-3.5 shrink-0 text-[#C8C8C8] lg:h-4 lg:w-4" />
-                <span className={footerLinkUnderline}>{contactLines.phone}</span>
+                <span className={footerLinkUnderline}>{contactPhone}</span>
               </a>
             </div>
           </div>
@@ -186,7 +197,7 @@ export function Footer({
           </h2>
 
           <div className="mt-3 flex flex-wrap items-center gap-3 sm:mt-4 lg:mt-5">
-            {socialLinks.map((social) => {
+            {footerSocialLinks.map((social) => {
               const Icon = social.icon;
 
               return (
@@ -216,9 +227,9 @@ export function Footer({
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                   <p className="text-xs font-extrabold leading-4 text-white">
-                    {facebookPreview.name}
+                    {facebookPagePreview.name}
                   </p>
-                  {facebookPreview.verified ? (
+                  {facebookPagePreview.verified ? (
                     <VerifiedBadgeIcon
                       className="h-3 w-3 shrink-0 text-[#C8C8C8]"
                       aria-hidden="true"
@@ -226,17 +237,18 @@ export function Footer({
                   ) : null}
                 </div>
                 <p className="mt-0.5 whitespace-nowrap text-[10px] leading-4 text-white/70">
-                  {facebookPreview.followers} &bull; {facebookPreview.following}
+                  {facebookPagePreview.followers} &bull;{" "}
+                  {facebookPagePreview.following}
                 </p>
               </div>
               <a
-                href={facebookPreview.pageUrl}
+                href={facebookPagePreview.pageUrl}
                 target="_blank"
                 rel="noreferrer"
-                aria-label={`${facebookPreview.actionLabel} ${facebookPreview.name} on Facebook`}
+                aria-label={`${facebookPagePreview.actionLabel} ${facebookPagePreview.name} on Facebook`}
                 className="ml-auto inline-flex h-6 shrink-0 items-center justify-center rounded-full border border-white/70 px-2.5 text-[10px] font-bold leading-none text-white transition-colors hover:border-white hover:bg-white hover:text-black"
               >
-                {facebookPreview.actionLabel}
+                {facebookPagePreview.actionLabel}
               </a>
             </div>
           </div>
@@ -249,10 +261,57 @@ export function Footer({
           "relative pb-4 text-center text-[10px] leading-5 text-white/60 sm:text-[11px]",
         )}
       >
-        &copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+        &copy; {new Date().getFullYear()} {settings.storeName}. All rights reserved.
       </p>
     </footer>
   );
+}
+
+function getFooterSocialLinks(settings: StorefrontSettingsDto) {
+  const dbLinks = settings.socialLinks
+    .filter((link) => link.isActive)
+    .map((link) => {
+      const Icon = getSocialIcon(link.id);
+
+      if (!Icon) {
+        return null;
+      }
+
+      return {
+        href: link.href,
+        icon: Icon,
+        label: link.label,
+      };
+    })
+    .filter((link): link is (typeof fallbackSocialLinks)[number] =>
+      Boolean(link),
+    );
+
+  return dbLinks.length ? dbLinks : fallbackSocialLinks;
+}
+
+function getSocialIcon(id: string) {
+  if (id === "facebook") {
+    return FacebookIcon;
+  }
+
+  if (id === "instagram") {
+    return InstagramIcon;
+  }
+
+  if (id === "tiktok") {
+    return TikTokIcon;
+  }
+
+  if (id === "youtube") {
+    return YouTubeIcon;
+  }
+
+  return null;
+}
+
+function isExternalImage(src: string) {
+  return /^https?:\/\//i.test(src);
 }
 
 function FacebookIcon(props: SVGProps<SVGSVGElement>) {

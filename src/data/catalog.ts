@@ -1,9 +1,9 @@
 import productData from "./products.json";
 import {
   categoryTaxonomy,
+  getAllCategories,
   getCategoryById,
   getCategoryByPath,
-  getCategoryFilterOptions,
   type CategoryNode,
   type RootCategorySlug,
 } from "@/data/category-taxonomy";
@@ -20,6 +20,7 @@ import type {
 import type { Product } from "@/types/product";
 
 const staticProducts = productData as Product[];
+const staticCategories = getAllCategories();
 
 validateStaticProductCategories(staticProducts);
 validateStaticProductInventory(staticProducts);
@@ -50,7 +51,7 @@ const productsListingCategory: CategoryNode = {
 };
 
 export function getProductBySlug(slug: string) {
-  return products.find((product) => product.slug === slug);
+  return getProductBySlugFromProducts(products, slug);
 }
 
 export function getProductsByPath(path: string) {
@@ -58,9 +59,7 @@ export function getProductsByPath(path: string) {
 }
 
 export function getProductsByCategoryPath(path: string[]) {
-  return products.filter((product) =>
-    startsWithPath(getProductCategoryPath(product), path),
-  );
+  return getProductsByCategoryPathFromCatalog(products, staticCategories, path);
 }
 
 export function getCategoryListingData({
@@ -72,18 +71,73 @@ export function getCategoryListingData({
   slug?: string[];
   searchParams?: ListingSearchParams;
 }): CategoryListingData | null {
+  return getCategoryListingDataFromCatalog({
+    categories: staticCategories,
+    products,
+    rootSlug,
+    searchParams,
+    slug,
+  });
+}
+
+export function getProductsListingData({
+  searchParams,
+}: {
+  searchParams?: ListingSearchParams;
+}) {
+  return getProductsListingDataFromCatalog({
+    categories: staticCategories,
+    products,
+    searchParams,
+  });
+}
+
+export function getProductBySlugFromProducts(
+  productsToSearch: Product[],
+  slug: string,
+) {
+  return productsToSearch.find((product) => product.slug === slug);
+}
+
+export function getProductsByCategoryPathFromCatalog(
+  productsToFilter: Product[],
+  categories: CategoryNode[],
+  path: string[],
+) {
+  return productsToFilter.filter((product) =>
+    startsWithPath(getProductCategoryPath(product, categories), path),
+  );
+}
+
+export function getCategoryListingDataFromCatalog({
+  categories,
+  products: catalogProducts,
+  rootSlug,
+  slug = [],
+  searchParams,
+}: {
+  categories: CategoryNode[];
+  products: Product[];
+  rootSlug: RootCategorySlug;
+  slug?: string[];
+  searchParams?: ListingSearchParams;
+}): CategoryListingData | null {
   const categoryPath = [rootSlug, ...slug];
-  const category = getCategoryByPath(categoryPath);
+  const category = getCategoryByPathFromCatalog(categories, categoryPath);
 
   if (!category) {
     return null;
   }
 
-  const baseProducts = getProductsByCategoryPath(category.path);
+  const baseProducts = getProductsByCategoryPathFromCatalog(
+    catalogProducts,
+    categories,
+    category.path,
+  );
   const filters = parseListingFilters(searchParams);
-  const facets = getProductListingFacets(baseProducts, category);
+  const facets = getProductListingFacets(baseProducts, category, categories);
   const productsForListing = sortProducts(
-    filterProducts(baseProducts, filters, category),
+    filterProducts(baseProducts, filters, category, categories),
     filters,
   );
 
@@ -96,15 +150,27 @@ export function getCategoryListingData({
   };
 }
 
-export function getProductsListingData({
+export function getProductsListingDataFromCatalog({
+  categories,
+  products: catalogProducts,
   searchParams,
 }: {
+  categories: CategoryNode[];
+  products: Product[];
   searchParams?: ListingSearchParams;
 }) {
   const filters = parseListingFilters(searchParams);
-  const facets = getProductListingFacets(products, productsListingCategory);
+  const productsCategory = {
+    ...productsListingCategory,
+    children: getRootCategoriesFromCatalog(categories),
+  };
+  const facets = getProductListingFacets(
+    catalogProducts,
+    productsCategory,
+    categories,
+  );
   const productsForListing = sortProducts(
-    filterProducts(products, filters, productsListingCategory),
+    filterProducts(catalogProducts, filters, productsCategory, categories),
     filters,
   );
 
@@ -116,9 +182,12 @@ export function getProductsListingData({
   };
 }
 
-export function getProductCategoryPath(product: Product) {
+export function getProductCategoryPath(
+  product: Product,
+  categories: CategoryNode[] = staticCategories,
+) {
   const primaryCategory = product.primaryCategoryId
-    ? getCategoryById(product.primaryCategoryId)
+    ? getCategoryByIdFromCatalog(categories, product.primaryCategoryId)
     : undefined;
 
   if (primaryCategory) {
@@ -147,24 +216,46 @@ export function getProductCategoryPath(product: Product) {
 }
 
 export function getProductPrimaryCategory(product: Product) {
+  return getProductPrimaryCategoryFromCatalog(product, staticCategories);
+}
+
+export function getProductPrimaryCategoryFromCatalog(
+  product: Product,
+  categories: CategoryNode[],
+) {
   const primaryCategory = product.primaryCategoryId
-    ? getCategoryById(product.primaryCategoryId)
+    ? getCategoryByIdFromCatalog(categories, product.primaryCategoryId)
     : undefined;
 
   if (primaryCategory) {
     return primaryCategory;
   }
 
-  return getDeepestCategoryByPath(getProductCategoryPath(product));
+  return getDeepestCategoryByPath(
+    getProductCategoryPath(product, categories),
+    categories,
+  );
+}
+
+export function getCategoryPathNodesFromCatalog(
+  category: CategoryNode,
+  categories: CategoryNode[],
+) {
+  return category.path
+    .map((_, index) =>
+      getCategoryByPathFromCatalog(categories, category.path.slice(0, index + 1)),
+    )
+    .filter((item): item is CategoryNode => Boolean(item));
 }
 
 function getProductListingFacets(
   baseProducts: Product[],
   category: CategoryNode,
+  categories: CategoryNode[],
 ): ProductListingFacets {
   // CATEGORY filter options come from taxonomy children; static product paths
   // only decide disabled state until products migrate to category IDs.
-  const categoryOptions = getCategoryFilterOptions(category);
+  const categoryOptions = getCategoryFilterOptionsFromCatalog(category, categories);
   const categoryFilterIndex = category.path.length;
 
   return {
@@ -175,7 +266,8 @@ function getProductListingFacets(
       value: option.slug,
       disabled: !baseProducts.some(
         (product) =>
-          getProductCategoryPath(product)[categoryFilterIndex] === option.slug,
+          getProductCategoryPath(product, categories)[categoryFilterIndex] ===
+          option.slug,
       ),
     })),
     priceRanges: priceRangeOptions.map((option) => ({
@@ -191,6 +283,7 @@ function filterProducts(
   baseProducts: Product[],
   filters: ListingFilters,
   category: CategoryNode,
+  categories: CategoryNode[],
 ) {
   const categoryFilterIndex = category.path.length;
   const selectedPriceRange = priceRangeOptions.find(
@@ -198,7 +291,7 @@ function filterProducts(
   );
 
   return baseProducts.filter((product) => {
-    const productPath = getProductCategoryPath(product);
+    const productPath = getProductCategoryPath(product, categories);
     const productColors = product.colors.map((color) => slugify(color.name));
     const productSizes = product.sizes.map(slugify);
 
@@ -276,9 +369,33 @@ function isPriceInRange(price: number, min: number, max: number) {
   return price >= min && price <= max;
 }
 
-function getDeepestCategoryByPath(path: string[]) {
+function getRootCategoriesFromCatalog(categories: CategoryNode[]) {
+  return categories
+    .filter((category) => category.depth === 0)
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+function getCategoryFilterOptionsFromCatalog(
+  category: CategoryNode,
+  categories: CategoryNode[],
+) {
+  return categories
+    .filter((item) => item.parentId === category.id)
+    .filter((item) => item.isActive && item.showInFilter)
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+function getCategoryByIdFromCatalog(categories: CategoryNode[], id: string) {
+  return categories.find((item) => item.id === id);
+}
+
+function getCategoryByPathFromCatalog(categories: CategoryNode[], path: string[]) {
+  return categories.find((item) => arePathsEqual(item.path, path));
+}
+
+function getDeepestCategoryByPath(path: string[], categories: CategoryNode[]) {
   for (let length = path.length; length > 0; length -= 1) {
-    const category = getCategoryByPath(path.slice(0, length));
+    const category = getCategoryByPathFromCatalog(categories, path.slice(0, length));
 
     if (category) {
       return category;
@@ -379,4 +496,8 @@ function validateStaticProductInventory(productsToValidate: Product[]) {
 
 function slugify(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function arePathsEqual(left: string[], right: string[]) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
 }

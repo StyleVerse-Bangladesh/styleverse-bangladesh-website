@@ -11,14 +11,18 @@ import {
   type BreadcrumbItem,
 } from "@/components/shared/site-breadcrumb";
 import {
-  getProductBySlug,
-  getProductPrimaryCategory,
-  products,
+  getCategoryPathNodesFromCatalog,
+  getProductPrimaryCategoryFromCatalog,
 } from "@/data/catalog";
 import {
   buildCategoryHref,
-  getCategoryPathNodes,
 } from "@/data/category-taxonomy";
+import {
+  getStorefrontProductBySlug,
+  getStorefrontProducts,
+  getStorefrontProductStaticParams,
+} from "@/data/catalog-access";
+import { getStorefrontCategories } from "@/data/category-access";
 import { siteContainerClassName } from "@/lib/constants/layout";
 import type { Product } from "@/types/product";
 
@@ -26,14 +30,17 @@ type ProductPageProps = {
   params: Promise<{ slug: string }>;
 };
 
-export function generateStaticParams() {
-  return products.map((product) => ({ slug: product.slug }));
+export async function generateStaticParams() {
+  return getStorefrontProductStaticParams();
 }
 
-function getProductBreadcrumbItems(product: Product): BreadcrumbItem[] {
-  const category = getProductPrimaryCategory(product);
+function getProductBreadcrumbItems(
+  product: Product,
+  categories: Awaited<ReturnType<typeof getStorefrontCategories>>,
+): BreadcrumbItem[] {
+  const category = getProductPrimaryCategoryFromCatalog(product, categories);
   const categoryItems = category
-    ? getCategoryPathNodes(category).map((item) => ({
+    ? getCategoryPathNodesFromCatalog(category, categories).map((item) => ({
         label: item.label,
         href: buildCategoryHref(item),
       }))
@@ -48,7 +55,11 @@ function getProductBreadcrumbItems(product: Product): BreadcrumbItem[] {
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const [product, products, categories] = await Promise.all([
+    getStorefrontProductBySlug(slug),
+    getStorefrontProducts(),
+    getStorefrontCategories(),
+  ]);
 
   if (!product) {
     notFound();
@@ -56,7 +67,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   return (
     <>
-      <SiteBreadcrumb items={getProductBreadcrumbItems(product)} />
+      <SiteBreadcrumb items={getProductBreadcrumbItems(product, categories)} />
       <section className="bg-white pb-8 md:hidden">
         <MobileProductGallery
           images={product.images}
