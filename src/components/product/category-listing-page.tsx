@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
-import { getCategoryListingData } from "@/data/catalog";
 import {
-  getCategoryPathNodes,
+  getCategoryListingData,
+} from "@/data/catalog-access";
+import { getStorefrontCategories } from "@/data/category-access";
+import { getCategoryPathNodesFromCatalog } from "@/data/catalog";
+import {
   type RootCategorySlug,
 } from "@/data/category-taxonomy";
 import type { ListingSearchParams } from "@/types/listing";
@@ -20,18 +23,24 @@ export async function CategoryListingPage({
   slug = [],
   searchParams,
 }: CategoryListingPageProps) {
-  const listingData = getCategoryListingData({
-    rootSlug,
-    slug,
-    searchParams: await searchParams,
-  });
+  const resolvedSearchParams = await searchParams;
+  const [listingData, categories] = await Promise.all([
+    getCategoryListingData({
+      rootSlug,
+      slug,
+      searchParams: resolvedSearchParams,
+    }),
+    getStorefrontCategories(),
+  ]);
 
   if (!listingData) {
     notFound();
   }
 
   return (
-    <ListingPageShell breadcrumbs={getCategoryBreadcrumbs(listingData.category)}>
+    <ListingPageShell
+      breadcrumbs={getCategoryBreadcrumbs(listingData.category, categories)}
+    >
       <ProductListing
         products={listingData.products}
         filters={listingData.filters}
@@ -44,10 +53,11 @@ export async function CategoryListingPage({
 
 function getCategoryBreadcrumbs(
   category: NonNullable<
-    ReturnType<typeof getCategoryListingData>
+    Awaited<ReturnType<typeof getCategoryListingData>>
   >["category"],
+  categories: Awaited<ReturnType<typeof getStorefrontCategories>>,
 ): BreadcrumbItem[] {
-  const pathNodes = getCategoryPathNodes(category);
+  const pathNodes = getCategoryPathNodesFromCatalog(category, categories);
 
   return [
     { label: "Home", href: "/" },

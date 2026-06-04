@@ -20,6 +20,7 @@ function getImageHostname(value: string | undefined) {
 
 const imageCdnHostnames = (
   [
+    "res.cloudinary.com",
     process.env.NEXT_PUBLIC_IMAGE_CDN_HOSTNAMES,
     process.env.IMAGE_CDN_HOSTNAMES,
     getImageHostname(process.env.NEXT_PUBLIC_IMAGE_BASE_URL),
@@ -29,7 +30,8 @@ const imageCdnHostnames = (
 )
   .split(",")
   .map((hostname) => getImageHostname(hostname))
-  .filter(Boolean);
+  .filter(Boolean)
+  .filter((hostname, index, hostnames) => hostnames.indexOf(hostname) === index);
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",

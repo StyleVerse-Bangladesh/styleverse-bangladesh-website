@@ -1,5 +1,5 @@
 import { CategoryListingPage } from "@/components/product/category-listing-page";
-import { generateCategoryStaticParams } from "@/data/category-taxonomy";
+import { generateCategoryStaticParams } from "@/data/category-access";
 import type { ListingSearchParams } from "@/types/listing";
 
 type SeasonalFitsCategoryPageProps = {
@@ -7,7 +7,7 @@ type SeasonalFitsCategoryPageProps = {
   searchParams?: Promise<ListingSearchParams>;
 };
 
-export function generateStaticParams() {
+export async function generateStaticParams() {
   return generateCategoryStaticParams("seasonal-fits");
 }
 

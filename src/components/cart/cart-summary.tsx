@@ -3,22 +3,26 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2 } from "lucide-react";
+import { CouponInput } from "@/components/cart/coupon-input";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/product/price";
 import {
   defaultImagePlaceholders,
   getImageUrl,
 } from "@/lib/constants/assets";
+import { getLineItemTotal } from "@/lib/pricing";
 import { useCartStore } from "@/store/cart-store";
+import { useCartSummary } from "@/hooks/use-cart-summary";
 import type { CartItem } from "@/types/cart";
+import type { StorefrontSettingsDto } from "@/types/api/settings.dto";
 
-export function CartSummary() {
+export function CartSummary({
+  deliverySettings,
+}: {
+  deliverySettings: StorefrontSettingsDto["delivery"];
+}) {
   const items = useCartStore((state) => state.items);
-  const subtotal = items.reduce(
-    (total, item) => total + item.product.price * item.quantity,
-    0,
-  );
-  const itemCount = items.reduce((total, item) => total + item.quantity, 0);
+  const summary = useCartSummary(deliverySettings);
 
   if (!items.length) {
     return <EmptyCartState />;
@@ -35,12 +39,20 @@ export function CartSummary() {
         ))}
       </div>
 
-      <OrderSummary itemCount={itemCount} subtotal={subtotal} />
+      <OrderSummary
+        itemCount={summary.itemCount}
+        subtotal={summary.subtotal}
+        deliveryFee={summary.deliveryFee}
+        couponDiscount={summary.couponDiscount}
+        shippingDiscount={summary.shippingDiscount}
+        total={summary.total}
+        appliedCouponCode={summary.appliedCoupon?.code}
+      />
 
       <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] md:hidden">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Subtotal</span>
-          <Price price={subtotal} className="text-base" />
+          <span className="text-sm text-muted-foreground">Estimated total</span>
+          <Price price={summary.total} className="text-base" />
         </div>
         <Button className="w-full" asChild>
           <Link href="/checkout">Continue checkout</Link>
@@ -154,7 +166,7 @@ function CartLineItem({ item }: { item: CartItem }) {
           <div className="text-right">
             <span className="text-xs text-muted-foreground">Line total</span>
             <Price
-              price={item.product.price * item.quantity}
+              price={getLineItemTotal(item)}
               className="justify-end text-base"
             />
           </div>
@@ -167,9 +179,19 @@ function CartLineItem({ item }: { item: CartItem }) {
 function OrderSummary({
   itemCount,
   subtotal,
+  deliveryFee,
+  couponDiscount,
+  shippingDiscount,
+  total,
+  appliedCouponCode,
 }: {
   itemCount: number;
   subtotal: number;
+  deliveryFee: number;
+  couponDiscount: number;
+  shippingDiscount: number;
+  total: number;
+  appliedCouponCode?: string;
 }) {
   return (
     <aside className="h-fit rounded-md border bg-background p-4 lg:sticky lg:top-24">
@@ -183,19 +205,31 @@ function OrderSummary({
           <span className="text-muted-foreground">Subtotal</span>
           <Price price={subtotal} />
         </div>
+        <CouponInput />
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground">Delivery</span>
-          <span>Calculated at checkout</span>
+          <Price price={deliveryFee} />
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">Discount</span>
-          <span>Apply at checkout</span>
-        </div>
+        {couponDiscount > 0 && appliedCouponCode ? (
+          <div className="flex items-center justify-between gap-3 text-emerald-700">
+            <span>Coupon ({appliedCouponCode})</span>
+            <Price price={-couponDiscount} className="justify-end text-emerald-700" />
+          </div>
+        ) : null}
+        {shippingDiscount > 0 && appliedCouponCode ? (
+          <div className="flex items-center justify-between gap-3 text-emerald-700">
+            <span>Shipping discount ({appliedCouponCode})</span>
+            <Price
+              price={-shippingDiscount}
+              className="justify-end text-emerald-700"
+            />
+          </div>
+        ) : null}
       </div>
       <div className="mt-4 border-t pt-4">
         <div className="flex items-center justify-between">
           <span className="font-medium">Estimated total</span>
-          <Price price={subtotal} className="text-base" />
+          <Price price={total} className="text-base" />
         </div>
         <Button className="mt-4 hidden w-full md:inline-flex" asChild>
           <Link href="/checkout">Continue checkout</Link>

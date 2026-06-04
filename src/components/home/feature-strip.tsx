@@ -1,6 +1,7 @@
-import { Check, Headphones, RefreshCcw, Truck } from "lucide-react";
+import { Check, Headphones, RefreshCcw, Truck, type LucideIcon } from "lucide-react";
 import { siteContainerClassName } from "@/lib/constants/layout";
 import { cn } from "@/lib/utils";
+import type { HomepageFeature } from "@/lib/api/adapters/homepage-adapter";
 
 const features = [
   {
@@ -21,7 +22,25 @@ const features = [
   },
 ];
 
-export function FeatureStrip() {
+const featureIcons: Record<HomepageFeature["icon"], LucideIcon> = {
+  check: Check,
+  headphones: Headphones,
+  refresh: RefreshCcw,
+  truck: Truck,
+};
+
+type FeatureStripProps = {
+  items?: HomepageFeature[];
+};
+
+export function FeatureStrip({ items }: FeatureStripProps) {
+  const renderedFeatures = items?.length
+    ? items.map((item) => ({
+        title: item.title,
+        icon: featureIcons[item.icon],
+      }))
+    : features;
+
   return (
     <section
       className="hidden border-y bg-[#f5f6f8] md:block"
@@ -33,7 +52,7 @@ export function FeatureStrip() {
           "grid grid-cols-2 gap-3 py-4 sm:gap-4 md:gap-5 lg:grid-cols-4 lg:gap-6 lg:py-7",
         )}
       >
-        {features.map((feature) => {
+        {renderedFeatures.map((feature) => {
           const Icon = feature.icon;
 
           return (

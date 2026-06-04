@@ -1,9 +1,10 @@
 import { create } from "zustand";
-import type { CartItem } from "@/types/cart";
+import type { AppliedCoupon, CartItem } from "@/types/cart";
 import type { Product } from "@/types/product";
 
 type CartState = {
   items: CartItem[];
+  appliedCoupon?: AppliedCoupon;
   addItem: (product: Product, variantId?: string, quantity?: number) => void;
   removeItem: (productId: string, variantId?: string) => void;
   updateQuantity: (productId: string, quantity: number, variantId?: string) => void;
@@ -12,6 +13,8 @@ type CartState = {
     currentVariantId: string | undefined,
     nextVariantId: string,
   ) => void;
+  applyCoupon: (couponSnapshot: AppliedCoupon) => void;
+  removeCoupon: () => void;
   clearCart: () => void;
 };
 
@@ -101,5 +104,7 @@ export const useCartStore = create<CartState>((set) => ({
         ),
       };
     }),
-  clearCart: () => set({ items: [] }),
+  applyCoupon: (couponSnapshot) => set({ appliedCoupon: couponSnapshot }),
+  removeCoupon: () => set({ appliedCoupon: undefined }),
+  clearCart: () => set({ items: [], appliedCoupon: undefined }),
 }));

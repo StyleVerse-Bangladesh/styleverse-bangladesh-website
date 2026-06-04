@@ -16,6 +16,7 @@ import type { Product } from "@/types/product";
 
 type ProductYouMayLikeSectionProps = {
   products: Product[];
+  title?: string;
 };
 
 const productsPerPage = 10;
@@ -33,6 +34,7 @@ function toHomeProduct(product: Product): HomeProductCardProduct {
 
 export function ProductYouMayLikeSection({
   products,
+  title = "Product You May Like",
 }: ProductYouMayLikeSectionProps) {
   const [visibleCount, setVisibleCount] = useState(productsPerPage);
   const visibleProducts = useMemo(
@@ -49,7 +51,7 @@ export function ProductYouMayLikeSection({
     <section className="bg-white pb-10 pt-0 sm:pb-14 sm:pt-2" aria-label="Product you may like">
       <div className={siteContainerClassName}>
         <div className="relative border-b border-black/10 pb-2.5 text-center sm:pb-5">
-          <HomeSectionHeading>Product You May Like</HomeSectionHeading>
+          <HomeSectionHeading>{title}</HomeSectionHeading>
           <span className="mx-auto mt-2 block h-px w-32 bg-black/35 sm:mt-4 sm:h-0.5 sm:w-56 sm:bg-black" />
         </div>
 

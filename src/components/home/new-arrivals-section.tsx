@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
-import { HomeProductCard } from "@/components/home/home-product-card";
+import {
+  HomeProductCard,
+  type HomeProductCardProduct,
+} from "@/components/home/home-product-card";
 import { HomeSectionHeading } from "@/components/home/home-section-heading";
 import { getProductBySlug } from "@/data/catalog";
 import { assets } from "@/lib/constants/assets";
 import { siteContainerClassName } from "@/lib/constants/layout";
+import type { Product } from "@/types/product";
 
 const newArrivalProducts = [
   {
@@ -67,17 +71,19 @@ const snapTransitionMs = 380;
 const newArrivalImageSizes =
   "(max-width: 767px) calc(50vw - 1.375rem), (max-width: 1023px) calc(33vw - 2rem), (max-width: 1279px) calc(25vw - 2rem), calc(20vw - 2rem)";
 
-type NewArrivalProduct = (typeof newArrivalProducts)[number];
+type NewArrivalProduct = HomeProductCardProduct;
 
 type CarouselProduct = NewArrivalProduct & {
   cloneKey: string;
   originalIndex: number;
 };
 
-function getProductByHref(href: string) {
+function getProductByHref(href: string, products: Product[] = []) {
   const slug = href.split("/").filter(Boolean).at(-1);
 
-  return slug ? getProductBySlug(slug) : undefined;
+  return slug
+    ? (products.find((product) => product.slug === slug) ?? getProductBySlug(slug))
+    : undefined;
 }
 
 function getSlideStep(track: HTMLDivElement) {
@@ -118,12 +124,23 @@ function getRenderedTranslate(track: HTMLElement, fallbackTranslate: number) {
   }
 }
 
-export function NewArrivalsSection() {
+type NewArrivalsSectionProps = {
+  cartProducts?: Product[];
+  products?: NewArrivalProduct[];
+  title?: string;
+};
+
+export function NewArrivalsSection({
+  cartProducts = [],
+  products,
+  title = "New Arrival Products",
+}: NewArrivalsSectionProps) {
+  const renderedProducts = products?.length ? products : newArrivalProducts;
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const pendingTranslateRef = useRef<number | null>(null);
-  const currentSlideIndexRef = useRef(newArrivalProducts.length * startCopyIndex);
+  const currentSlideIndexRef = useRef(renderedProducts.length * startCopyIndex);
   const slideStepRef = useRef(0);
   const translateRef = useRef(0);
   const dragState = useRef({
@@ -137,13 +154,13 @@ export function NewArrivalsSection() {
   const carouselProducts = useMemo<CarouselProduct[]>(
     () =>
       Array.from({ length: carouselCopies }, (_, copyIndex) =>
-        newArrivalProducts.map((product, productIndex) => ({
+        renderedProducts.map((product, productIndex) => ({
           ...product,
           cloneKey: `${copyIndex}-${productIndex}`,
           originalIndex: productIndex,
         })),
       ).flat(),
-    [],
+    [renderedProducts],
   );
 
   useEffect(() => {
@@ -154,7 +171,7 @@ export function NewArrivalsSection() {
     }
 
     const carouselTrack = track;
-    const productCount = newArrivalProducts.length;
+    const productCount = renderedProducts.length;
 
     function setTrackTransition(enabled: boolean) {
       carouselTrack.style.transition = enabled
@@ -228,7 +245,7 @@ export function NewArrivalsSection() {
         window.cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, []);
+  }, [renderedProducts.length]);
 
   function setTrackTransition(enabled: boolean) {
     const track = trackRef.current;
@@ -303,7 +320,7 @@ export function NewArrivalsSection() {
       return;
     }
 
-    const productCount = newArrivalProducts.length;
+    const productCount = renderedProducts.length;
     const rawSlideDelta = -dragState.current.dragOffset / slideStepRef.current;
     const dragThreshold = Math.min(
       Math.max(slideStepRef.current * 0.18, 36),
@@ -394,7 +411,7 @@ export function NewArrivalsSection() {
     <section className="bg-white pb-8 pt-0 sm:pb-12 sm:pt-2" aria-label="New arrivals">
       <div className={siteContainerClassName}>
         <div className="relative border-b border-black/10 pb-2.5 text-center sm:pb-5">
-          <HomeSectionHeading>New Arrival Products</HomeSectionHeading>
+          <HomeSectionHeading>{title}</HomeSectionHeading>
           <span className="mx-auto mt-2 block h-px w-32 bg-black/35 sm:mt-4 sm:h-0.5 sm:w-56 sm:bg-black" />
           <Link
             href="/products"
@@ -422,7 +439,7 @@ export function NewArrivalsSection() {
               <HomeProductCard
                 key={product.cloneKey}
                 product={product}
-                cartProduct={getProductByHref(product.href)}
+                cartProduct={getProductByHref(product.href, cartProducts)}
                 imageSizes={newArrivalImageSizes}
                 draggable={false}
                 onProductClick={handleProductClick}

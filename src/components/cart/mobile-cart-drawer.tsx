@@ -10,6 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { CouponInput } from "@/components/cart/coupon-input";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/product/price";
 import {
@@ -17,21 +18,32 @@ import {
   getImageUrl,
 } from "@/lib/constants/assets";
 import { getVariantAvailability } from "@/lib/inventory";
+import { getLineItemTotal } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/store/cart-store";
 import { useUiStore } from "@/store/ui-store";
+import { useCartSummary } from "@/hooks/use-cart-summary";
 import type { CartItem } from "@/types/cart";
+import type { StorefrontSettingsDto } from "@/types/api/settings.dto";
 import type { ProductVariant } from "@/types/product";
 
-export function MobileCartDrawer() {
+export function MobileCartDrawer({
+  deliverySettings,
+}: {
+  deliverySettings: StorefrontSettingsDto["delivery"];
+}) {
   const open = useUiStore((state) => state.isMobileCartDrawerOpen);
   const setOpen = useUiStore((state) => state.setMobileCartDrawerOpen);
   const items = useCartStore((state) => state.items);
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
-  const subtotal = items.reduce(
-    (total, item) => total + item.product.price * item.quantity,
-    0,
-  );
+  const {
+    subtotal,
+    deliveryFee,
+    couponDiscount,
+    shippingDiscount,
+    total,
+    appliedCoupon,
+  } = useCartSummary(deliverySettings);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 768px)");
@@ -82,9 +94,39 @@ export function MobileCartDrawer() {
         )}
 
         <div className="border-t border-zinc-200 bg-white px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-12px_30px_rgba(0,0,0,0.08)]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <span className="text-sm font-medium text-zinc-600">Subtotal</span>
-            <Price price={subtotal} className="justify-end text-base text-black" />
+          {items.length ? <CouponInput className="mb-3 p-2.5" /> : null}
+
+          <div className="mb-3 grid gap-2 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-zinc-600">Subtotal</span>
+              <Price price={subtotal} className="justify-end text-sm text-black" />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-zinc-600">Delivery</span>
+              <Price price={deliveryFee} className="justify-end text-sm text-black" />
+            </div>
+            {couponDiscount > 0 && appliedCoupon ? (
+              <div className="flex items-center justify-between gap-3 text-emerald-700">
+                <span>Coupon ({appliedCoupon.code})</span>
+                <Price
+                  price={-couponDiscount}
+                  className="justify-end text-sm text-emerald-700"
+                />
+              </div>
+            ) : null}
+            {shippingDiscount > 0 && appliedCoupon ? (
+              <div className="flex items-center justify-between gap-3 text-emerald-700">
+                <span>Shipping discount ({appliedCoupon.code})</span>
+                <Price
+                  price={-shippingDiscount}
+                  className="justify-end text-sm text-emerald-700"
+                />
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between gap-3 border-t border-zinc-200 pt-2">
+              <span className="font-semibold text-black">Estimated total</span>
+              <Price price={total} className="justify-end text-base text-black" />
+            </div>
           </div>
 
           {items.length ? (
@@ -238,7 +280,7 @@ function MobileCartLineItem({
               Line total
             </span>
             <Price
-              price={item.product.price * item.quantity}
+              price={getLineItemTotal(item)}
               className="justify-end text-sm text-black"
             />
           </div>
