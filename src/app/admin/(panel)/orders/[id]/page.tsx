@@ -108,6 +108,7 @@ export default async function AdminOrderDetailsPage({
   const latestTrackingNumber =
     order.deliveryEvents.find((event) => event.trackingNumber)?.trackingNumber ??
     null;
+  const latestRiskCheck = order.riskChecks[0] ?? null;
 
   return (
     <div className="grid gap-6">
@@ -270,15 +271,45 @@ export default async function AdminOrderDetailsPage({
               <dl className="grid gap-3 text-sm">
                 <InfoPair label="Customer Phone">{order.customerPhone}</InfoPair>
                 <InfoPair label="Risk Status">
-                  <PlaceholderBadge>Not Checked</PlaceholderBadge>
+                  {latestRiskCheck ? (
+                    <RiskLevelBadge riskLevel={latestRiskCheck.riskLevel} />
+                  ) : (
+                    <PlaceholderBadge>Not Checked</PlaceholderBadge>
+                  )}
+                </InfoPair>
+                <InfoPair label="Checked At">
+                  {latestRiskCheck ? (
+                    formatDateTime(latestRiskCheck.checkedAt)
+                  ) : (
+                    <MutedText>Not checked</MutedText>
+                  )}
                 </InfoPair>
               </dl>
               <dl className="grid gap-2 sm:grid-cols-2">
-                <MetricPlaceholder label="Total Previous Orders" />
-                <MetricPlaceholder label="Delivered" />
-                <MetricPlaceholder label="Cancelled" />
-                <MetricPlaceholder label="Returned" />
-                <MetricPlaceholder label="Success Rate" />
+                <RiskMetric
+                  label="Total Orders"
+                  value={latestRiskCheck?.totalOrders}
+                />
+                <RiskMetric
+                  label="Delivered"
+                  value={latestRiskCheck?.deliveredOrders}
+                />
+                <RiskMetric
+                  label="Cancelled"
+                  value={latestRiskCheck?.cancelledOrders}
+                />
+                <RiskMetric
+                  label="Returned"
+                  value={latestRiskCheck?.returnedOrders}
+                />
+                <RiskMetric
+                  label="Success Rate"
+                  value={
+                    latestRiskCheck?.successRate
+                      ? `${latestRiskCheck.successRate.toFixed(2)}%`
+                      : null
+                  }
+                />
               </dl>
               <FraudRiskCheckForm orderId={order.id} />
             </div>
@@ -476,6 +507,23 @@ async function getOrder(orderId: string) {
       },
       paymentMethod: true,
       paymentStatus: true,
+      riskChecks: {
+        orderBy: [{ checkedAt: "desc" }, { createdAt: "desc" }],
+        select: {
+          cancelledOrders: true,
+          checkedAt: true,
+          createdAt: true,
+          deliveredOrders: true,
+          id: true,
+          provider: true,
+          returnedOrders: true,
+          riskLevel: true,
+          riskScore: true,
+          successRate: true,
+          totalOrders: true,
+        },
+        take: 1,
+      },
       shippingDiscount: true,
       statusHistory: {
         orderBy: [{ createdAt: "desc" }],
@@ -723,12 +771,33 @@ function PlaceholderBadge({ children }: { children: ReactNode }) {
   );
 }
 
-function MetricPlaceholder({ label }: { label: string }) {
+function RiskMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string | null | undefined;
+}) {
   return (
     <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
       <dt className="text-xs font-semibold uppercase text-zinc-500">{label}</dt>
-      <dd className="mt-1 text-sm font-black text-zinc-950">Not checked</dd>
+      <dd className="mt-1 text-sm font-black text-zinc-950">
+        {value ?? "Not checked"}
+      </dd>
     </div>
+  );
+}
+
+function RiskLevelBadge({ riskLevel }: { riskLevel: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-7 w-fit items-center rounded-md border px-2 text-xs font-semibold",
+        getRiskLevelClassName(riskLevel),
+      )}
+    >
+      {formatStatus(riskLevel)}
+    </span>
   );
 }
 
@@ -762,6 +831,18 @@ function getStatusClassName(status: string) {
   }
 
   return "border-sky-200 bg-sky-50 text-sky-700";
+}
+
+function getRiskLevelClassName(riskLevel: string) {
+  if (riskLevel === "LOW") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (riskLevel === "MEDIUM" || riskLevel === "UNKNOWN") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
+  return "border-red-200 bg-red-50 text-red-700";
 }
 
 function isRecord(value: Prisma.JsonValue): value is Prisma.JsonObject {

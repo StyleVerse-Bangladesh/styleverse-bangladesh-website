@@ -7,6 +7,7 @@ import {
   MapPin,
   Phone,
   ReceiptText,
+  ShieldAlert,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import {
   CustomerNotesForm,
   CustomerStatusForm,
 } from "@/app/admin/(panel)/customers/customer-controls";
+import { getLatestRiskCheckByPhone } from "@/lib/fraud/customer-risk";
 import { cn } from "@/lib/utils";
 import { db } from "@/lib/db";
 
@@ -43,6 +45,9 @@ export default async function AdminCustomerDetailsPage({
     notFound();
   }
 
+  const latestRiskCheck = customer.phone
+    ? await getLatestRiskCheckByPhone(customer.phone)
+    : null;
   const totalOrders = customer.orders.length;
   const totalSpend = customer.orders.reduce(
     (total, order) => total + Number(order.grandTotal),
@@ -183,6 +188,48 @@ export default async function AdminCustomerDetailsPage({
                 Blocked customers are marked for future checkout enforcement.
               </p>
             ) : null}
+          </InfoCard>
+
+          <InfoCard icon={ShieldAlert} title="Latest Risk Check">
+            {latestRiskCheck ? (
+              <dl className="grid gap-3 text-sm">
+                <InfoPair label="Risk Level">
+                  <RiskLevelBadge riskLevel={latestRiskCheck.riskLevel} />
+                </InfoPair>
+                <InfoPair label="Provider">{latestRiskCheck.provider}</InfoPair>
+                <InfoPair label="Checked At">
+                  {formatDateTime(latestRiskCheck.checkedAt)}
+                </InfoPair>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <RiskMetric
+                    label="Total"
+                    value={latestRiskCheck.totalOrders}
+                  />
+                  <RiskMetric
+                    label="Delivered"
+                    value={latestRiskCheck.deliveredOrders}
+                  />
+                  <RiskMetric
+                    label="Cancelled"
+                    value={latestRiskCheck.cancelledOrders}
+                  />
+                  <RiskMetric
+                    label="Returned"
+                    value={latestRiskCheck.returnedOrders}
+                  />
+                  <RiskMetric
+                    label="Success Rate"
+                    value={
+                      latestRiskCheck.successRate
+                        ? `${latestRiskCheck.successRate.toFixed(2)}%`
+                        : null
+                    }
+                  />
+                </div>
+              </dl>
+            ) : (
+              <EmptyInline message="No risk check stored for this phone yet." />
+            )}
           </InfoCard>
 
           <InfoCard icon={ReceiptText} title="Internal Notes">
@@ -445,6 +492,36 @@ function OrderStatusBadge({ status }: { status: string }) {
   );
 }
 
+function RiskLevelBadge({ riskLevel }: { riskLevel: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-7 w-fit items-center rounded-md border px-2 text-xs font-semibold",
+        getRiskLevelClassName(riskLevel),
+      )}
+    >
+      {formatStatus(riskLevel)}
+    </span>
+  );
+}
+
+function RiskMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string | null | undefined;
+}) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+      <dt className="text-xs font-semibold uppercase text-zinc-500">{label}</dt>
+      <dd className="mt-1 text-sm font-black text-zinc-950">
+        {value ?? "Not checked"}
+      </dd>
+    </div>
+  );
+}
+
 function EmptyInline({ message }: { message: string }) {
   return (
     <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50 p-5 text-center text-sm font-semibold text-zinc-500">
@@ -475,6 +552,18 @@ function getOrderStatusClassName(status: string) {
   }
 
   return "border-sky-200 bg-sky-50 text-sky-700";
+}
+
+function getRiskLevelClassName(riskLevel: string) {
+  if (riskLevel === "LOW") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (riskLevel === "MEDIUM" || riskLevel === "UNKNOWN") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
+  return "border-red-200 bg-red-50 text-red-700";
 }
 
 function formatStatus(status: string) {

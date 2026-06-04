@@ -212,6 +212,44 @@ async function main() {
     },
   });
 
+  await prisma.paymentGateway.upsert({
+    where: { code: "ONLINE_PAYMENT" },
+    update: {},
+    create: {
+      code: "ONLINE_PAYMENT",
+      isActive: false,
+      isTestMode: true,
+      label: "Online Payment Placeholder",
+      provider: "SSL_COMMERZ_PLACEHOLDER",
+      publicConfig: {
+        note: "Placeholder only. No payment provider is connected.",
+      },
+      sortOrder: 0,
+    },
+  });
+
+  await prisma.courierAccount.upsert({
+    where: { id: "00000000-0000-0000-0000-000000000201" },
+    update: {
+      isActive: false,
+      isTestMode: true,
+      label: "Pathao Merchant",
+      provider: "PATHAO",
+      sortOrder: 0,
+    },
+    create: {
+      id: "00000000-0000-0000-0000-000000000201",
+      isActive: false,
+      isTestMode: true,
+      label: "Pathao Merchant",
+      provider: "PATHAO",
+      publicConfig: {
+        note: "Placeholder only. No Pathao Merchant API calls are enabled.",
+      },
+      sortOrder: 0,
+    },
+  });
+
   await prisma.deliveryRule.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
     update: {
@@ -248,6 +286,7 @@ async function main() {
       `and ${productStats.preorders} preorder settings.`,
       `Seeded ${homepageStats.sections} homepage sections and ${homepageStats.items} homepage items.`,
       `Seeded ${couponCount} coupons.`,
+      "Seeded placeholder Pathao courier account.",
     ].join(" "),
   );
 }

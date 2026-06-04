@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import {
@@ -106,6 +107,20 @@ export function SettingsAdminPage({
             Manage global storefront identity, contact details, app metadata,
             payment method labels, and delivery rules.
           </p>
+          <Link
+            className={cn(secondaryButtonClassName, "mt-4 w-fit")}
+            href="/admin/settings/payments"
+          >
+            <Wallet className="h-4 w-4" aria-hidden="true" />
+            Payment Gateway Settings
+          </Link>
+          <Link
+            className={cn(secondaryButtonClassName, "ml-0 mt-2 w-fit sm:ml-2 sm:mt-4")}
+            href="/admin/settings/courier"
+          >
+            <Truck className="h-4 w-4" aria-hidden="true" />
+            Courier Settings
+          </Link>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">

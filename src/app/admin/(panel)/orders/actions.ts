@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { DeliveryStatus, OrderStatus, PaymentStatus } from "@prisma/client";
 import { getSession } from "@/lib/auth/session";
+import { fetchPathaoCustomerRisk } from "@/lib/courier/pathao-risk";
 import { db } from "@/lib/db";
+import {
+  createPlaceholderRiskCheck,
+  createRiskCheckFromMetrics,
+} from "@/lib/fraud/customer-risk";
 
 const orderStatusOptions = [
   OrderStatus.PENDING,
@@ -137,7 +142,47 @@ export async function checkFraudRiskAction(
     return errorState(validation.error);
   }
 
-  return successState("Fraud check service not connected yet.");
+  const order = await db.order.findUnique({
+    where: { id: validation.orderId },
+    select: {
+      customerId: true,
+      customerPhone: true,
+      id: true,
+    },
+  });
+
+  if (!order) {
+    return errorState("Order no longer exists.");
+  }
+
+  const riskResult = await fetchPathaoCustomerRisk(order.customerPhone);
+
+  if (!riskResult.ok) {
+    await createPlaceholderRiskCheck({
+      customerId: order.customerId,
+      orderId: order.id,
+      phone: order.customerPhone,
+    });
+
+    revalidateOrders(order.id);
+
+    return successState(
+      `${riskResult.error} Placeholder UNKNOWN risk check saved.`,
+    );
+  }
+
+  await createRiskCheckFromMetrics({
+    customerId: order.customerId,
+    metrics: riskResult.metrics,
+    orderId: order.id,
+    phone: order.customerPhone,
+    provider: riskResult.provider,
+    providerPayload: riskResult.providerPayload,
+  });
+
+  revalidateOrders(order.id);
+
+  return successState("Fraud/risk check saved.");
 }
 
 export async function syncPaymentStatusAction(

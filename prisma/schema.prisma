@@ -89,6 +89,13 @@ enum HomepageSectionType {
   PROMOTIONAL_CONTENT
 }
 
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  UNKNOWN
+}
+
 // Prisma enum values must be mapped by adapters to storefront lowercase values
 // such as in_stock, pre_order, and free_shipping.
 
@@ -206,30 +213,30 @@ model ProductImage {
 }
 
 model MediaFile {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  filename        String
-  storedFilename  String    @unique @map("stored_filename")
-  url             String    @unique
-  mimeType        String    @map("mime_type")
-  sizeBytes       Int       @map("size_bytes")
-  storageProvider String    @default("local") @map("storage_provider")
-  storagePath     String    @map("storage_path")
-  publicId        String?   @unique @map("public_id")
-  secureUrl       String?   @map("secure_url")
-  format          String?
-  width           Int?
-  height          Int?
-  bytes           Int?
-  originalFilename String?  @map("original_filename")
-  originalFormat  String?   @map("original_format")
-  originalWidth   Int?      @map("original_width")
-  originalHeight  Int?      @map("original_height")
-  originalBytes   Int?      @map("original_bytes")
-  folder          String?
-  altText         String?   @map("alt_text")
-  uploadedAt      DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz(6)
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  filename         String
+  storedFilename   String    @unique @map("stored_filename")
+  url              String    @unique
+  mimeType         String    @map("mime_type")
+  sizeBytes        Int       @map("size_bytes")
+  storageProvider  String    @default("local") @map("storage_provider")
+  storagePath      String    @map("storage_path")
+  publicId         String?   @unique @map("public_id")
+  secureUrl        String?   @map("secure_url")
+  format           String?
+  width            Int?
+  height           Int?
+  bytes            Int?
+  originalFilename String?   @map("original_filename")
+  originalFormat   String?   @map("original_format")
+  originalWidth    Int?      @map("original_width")
+  originalHeight   Int?      @map("original_height")
+  originalBytes    Int?      @map("original_bytes")
+  folder           String?
+  altText          String?   @map("alt_text")
+  uploadedAt       DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([filename])
   @@index([folder])
@@ -446,14 +453,17 @@ model Order {
   createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customer          Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  coupon            Coupon?              @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  items             OrderItem[]
-  statusHistory     OrderStatusHistory[]
-  paymentEvents     PaymentEvent[]
-  deliveryEvents    DeliveryEvent[]
-  couponRedemptions CouponRedemption[]
-  invoice           Invoice?
+  customer            Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  coupon              Coupon?              @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items               OrderItem[]
+  statusHistory       OrderStatusHistory[]
+  paymentEvents       PaymentEvent[]
+  paymentTransactions PaymentTransaction[]
+  deliveryEvents      DeliveryEvent[]
+  couponRedemptions   CouponRedemption[]
+  invoice             Invoice?
+  courierShipments    CourierShipment[]
+  riskChecks          CustomerRiskCheck[]
 
   @@index([customerId])
   @@index([orderStatus])
@@ -518,14 +528,14 @@ model OrderItem {
 }
 
 model OrderStatusHistory {
-  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId          String       @map("order_id") @db.Uuid
-  statusType       String       @default("ORDER") @map("status_type")
-  fromStatus       String?      @map("from_status")
-  toStatus         String       @map("to_status")
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId          String   @map("order_id") @db.Uuid
+  statusType       String   @default("ORDER") @map("status_type")
+  fromStatus       String?  @map("from_status")
+  toStatus         String   @map("to_status")
   note             String?
-  changedByAdminId String?      @map("changed_by_admin_id") @db.Uuid
-  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  changedByAdminId String?  @map("changed_by_admin_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   order          Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   changedByAdmin AdminUser? @relation(fields: [changedByAdminId], references: [id])
@@ -537,22 +547,183 @@ model OrderStatusHistory {
 }
 
 model PaymentEvent {
-  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId       String        @map("order_id") @db.Uuid
-  provider      String
-  eventType     String        @map("event_type")
-  status        PaymentStatus
-  amount        Decimal?      @db.Decimal(12, 2)
-  transactionId String?       @map("transaction_id")
-  payload       Json?
-  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId              String        @map("order_id") @db.Uuid
+  gatewayId            String?       @map("gateway_id") @db.Uuid
+  paymentTransactionId String?       @map("payment_transaction_id") @db.Uuid
+  provider             String
+  eventType            String        @map("event_type")
+  status               PaymentStatus
+  amount               Decimal?      @db.Decimal(12, 2)
+  transactionId        String?       @map("transaction_id")
+  payload              Json?
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order              Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gateway            PaymentGateway?     @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+  paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
+  @@index([gatewayId])
+  @@index([paymentTransactionId])
   @@index([transactionId])
   @@index([status])
   @@map("payment_events")
+}
+
+model PaymentGateway {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                     String   @unique
+  label                    String
+  provider                 String
+  isActive                 Boolean  @default(false) @map("is_active")
+  isTestMode               Boolean  @default(true) @map("is_test_mode")
+  publicConfig             Json?    @map("public_config")
+  secretConfigPlaceholder  String?  @map("secret_config_placeholder")
+  webhookSecretPlaceholder String?  @map("webhook_secret_placeholder")
+  sortOrder                Int      @default(0) @map("sort_order")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  transactions PaymentTransaction[]
+  events       PaymentEvent[]
+
+  @@index([provider])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("payment_gateways")
+}
+
+model PaymentTransaction {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId        String        @map("order_id") @db.Uuid
+  gatewayId      String?       @map("gateway_id") @db.Uuid
+  transactionId  String?       @map("transaction_id")
+  amount         Decimal       @db.Decimal(12, 2)
+  currency       String        @default("BDT")
+  status         PaymentStatus @default(PENDING)
+  providerStatus String?       @map("provider_status")
+  paymentMethod  String        @map("payment_method")
+  payload        Json?
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gateway PaymentGateway? @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+  events  PaymentEvent[]
+
+  @@index([orderId])
+  @@index([gatewayId])
+  @@index([transactionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payment_transactions")
+}
+
+model CourierAccount {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider                String
+  label                   String
+  isActive                Boolean   @default(false) @map("is_active")
+  isTestMode              Boolean   @default(true) @map("is_test_mode")
+  clientIdPlaceholder     String?   @map("client_id_placeholder")
+  clientSecretPlaceholder String?   @map("client_secret_placeholder")
+  usernamePlaceholder     String?   @map("username_placeholder")
+  passwordPlaceholder     String?   @map("password_placeholder")
+  storeIdPlaceholder      String?   @map("store_id_placeholder")
+  accessTokenPlaceholder  String?   @map("access_token_placeholder")
+  refreshTokenPlaceholder String?   @map("refresh_token_placeholder")
+  tokenExpiresAt          DateTime? @map("token_expires_at") @db.Timestamptz(6)
+  publicConfig            Json?     @map("public_config")
+  sortOrder               Int       @default(0) @map("sort_order")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shipments CourierShipment[]
+  events    CourierEvent[]
+
+  @@index([provider])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("courier_accounts")
+}
+
+model CourierShipment {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId                  String   @map("order_id") @db.Uuid
+  courierAccountId         String?  @map("courier_account_id") @db.Uuid
+  provider                 String
+  consignmentId            String?  @map("consignment_id")
+  trackingNumber           String?  @map("tracking_number")
+  merchantOrderId          String?  @map("merchant_order_id")
+  recipientNameSnapshot    String?  @map("recipient_name_snapshot")
+  recipientPhoneSnapshot   String?  @map("recipient_phone_snapshot")
+  recipientAddressSnapshot String?  @map("recipient_address_snapshot")
+  citySnapshot             String?  @map("city_snapshot")
+  zoneSnapshot             String?  @map("zone_snapshot")
+  areaSnapshot             String?  @map("area_snapshot")
+  deliveryFeeSnapshot      Decimal? @map("delivery_fee_snapshot") @db.Decimal(12, 2)
+  status                   String   @default("PENDING")
+  providerStatus           String?  @map("provider_status")
+  payload                  Json?
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  courierAccount CourierAccount? @relation(fields: [courierAccountId], references: [id], onDelete: SetNull)
+  events         CourierEvent[]
+
+  @@index([orderId])
+  @@index([courierAccountId])
+  @@index([provider])
+  @@index([consignmentId])
+  @@index([trackingNumber])
+  @@index([status])
+  @@index([createdAt])
+  @@map("courier_shipments")
+}
+
+model CourierEvent {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shipmentId       String   @map("shipment_id") @db.Uuid
+  courierAccountId String?  @map("courier_account_id") @db.Uuid
+  eventType        String   @map("event_type")
+  status           String?
+  providerStatus   String?  @map("provider_status")
+  payload          Json?
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  shipment       CourierShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  courierAccount CourierAccount? @relation(fields: [courierAccountId], references: [id], onDelete: SetNull)
+
+  @@index([shipmentId])
+  @@index([courierAccountId])
+  @@index([eventType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("courier_events")
+}
+
+model CourierAreaMapping {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider  String
+  cityName  String   @map("city_name")
+  cityId    String   @map("city_id")
+  zoneName  String   @map("zone_name")
+  zoneId    String   @map("zone_id")
+  areaName  String   @map("area_name")
+  areaId    String   @map("area_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([provider, cityId, zoneId, areaId])
+  @@index([provider])
+  @@index([cityName])
+  @@index([zoneName])
+  @@index([areaName])
+  @@index([isActive])
+  @@map("courier_area_mappings")
 }
 
 model DeliveryEvent {
@@ -591,9 +762,39 @@ model Customer {
   orders      Order[]
   invoices    Invoice[]
   redemptions CouponRedemption[]
+  riskChecks  CustomerRiskCheck[]
 
   @@index([isActive])
   @@map("customers")
+}
+
+model CustomerRiskCheck {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone           String
+  customerId      String?   @map("customer_id") @db.Uuid
+  orderId         String?   @map("order_id") @db.Uuid
+  provider        String
+  totalOrders     Int       @default(0) @map("total_orders")
+  deliveredOrders Int       @default(0) @map("delivered_orders")
+  cancelledOrders Int       @default(0) @map("cancelled_orders")
+  returnedOrders  Int       @default(0) @map("returned_orders")
+  successRate     Decimal?  @map("success_rate") @db.Decimal(5, 2)
+  riskLevel       RiskLevel @default(UNKNOWN) @map("risk_level")
+  riskScore       Int?      @map("risk_score")
+  providerPayload Json?     @map("provider_payload")
+  checkedAt       DateTime  @default(now()) @map("checked_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  order    Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([phone])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([provider])
+  @@index([riskLevel])
+  @@index([checkedAt])
+  @@map("customer_risk_checks")
 }
 
 model CustomerAddress {

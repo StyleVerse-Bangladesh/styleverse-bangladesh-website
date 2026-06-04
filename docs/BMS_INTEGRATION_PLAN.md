@@ -262,11 +262,20 @@ Future table ideas:
 
 - `payment_gateways`
 
+Implemented foundation table:
+
+- `payment_gateways`
+
+Gateway records should store provider/code, label, active state, test/live mode, public JSON config, secret placeholders until encryption exists, webhook secret placeholders, sort order, and audit timestamps.
+
 Migration notes:
 
 - Do not expose payment gateway secret keys to the browser.
 - Keep gateway credentials in environment variables or encrypted database fields.
+- Until encryption is implemented, store only secret placeholders and allow replacement without displaying saved secret values.
 - Payment settings should not create transactions by themselves; they only configure available providers and methods.
+- COD remains in `payment_methods` and is not a gateway record.
+- Checkout continues to use `payment_methods` availability until a future gateway redirect/transaction flow is built.
 
 ## Phase 6B: Payment Gateway Integration
 
@@ -286,13 +295,45 @@ Future table ideas:
 - `payment_transactions`
 - `payment_events`
 
-Payment transaction records should store order ID, gateway ID, method, amount, currency, status, gateway reference, gateway response summary, and refund references when applicable.
+Implemented foundation tables:
+
+- `payment_transactions`
+- Existing `payment_events`, extended with optional gateway and transaction links.
+
+Payment transaction records should store order ID, gateway ID, method, amount, currency, internal status, provider status, gateway transaction reference, provider payload summary, and refund references when applicable.
+
+Expected transaction lifecycle:
+
+```text
+Order created with online payment
+  |
+  v
+Payment transaction initialized server-side
+  |
+  v
+Customer redirected or provider session created
+  |
+  v
+Provider callback/webhook received
+  |
+  v
+Webhook verified server-side
+  |
+  v
+Payment transaction and order payment status updated
+  |
+  v
+Payment event appended for audit history
+```
 
 Migration notes:
 
 - Frontend payment status is never authoritative.
 - Gateway webhook handlers must verify provider signatures or authenticity before mutating orders.
+- Status sync jobs must run server-side and must not trust browser-submitted provider status.
 - API logs should avoid storing secrets, full card data, or unnecessary sensitive payloads.
+- Refund support should be added later as a separate transaction/event workflow with provider references and audited admin actions.
+- Do not add provider SDKs, redirect flows, or webhook routes until a specific payment provider is selected.
 
 ## Phase 7: Customer Auth, Profile, Wishlist, and Order History API
 
@@ -332,6 +373,83 @@ Future table ideas:
 - `courier_accounts`
 - `courier_area_mappings`
 
+Implemented foundation tables:
+
+- `courier_accounts`
+- `courier_area_mappings`
+
+Courier account records should store provider, label, active state, test/live mode, public JSON config, store ID placeholder, and credential/token placeholders until encrypted credential storage is implemented.
+
+Pathao credential storage plan:
+
+- Keep Pathao client ID, client secret, username, password, store ID, access token, refresh token, and token expiry server-side only.
+- Current implementation reads real Pathao test-connection credentials from server-side `.env` values: `PATHAO_API_BASE_URL`, `PATHAO_CLIENT_ID`, `PATHAO_CLIENT_SECRET`, `PATHAO_USERNAME`, `PATHAO_PASSWORD`, and `PATHAO_STORE_ID`.
+- `courier_accounts` stores only placeholders and safe token status metadata for the current implementation.
+- Do not return saved client secrets, passwords, access tokens, or refresh tokens to browser-rendered admin pages.
+- Until encryption is implemented, store placeholders only and allow replacement without displaying saved values.
+- Add encrypted database credential and token storage as a future upgrade before broader Pathao API integration.
+
+Future token refresh flow:
+
+```text
+Admin enables Pathao courier account
+  |
+  v
+Backend validates encrypted credentials
+  |
+  v
+Backend requests/refreshes Pathao access token server-side
+  |
+  v
+Encrypted token reference and tokenExpiresAt updated
+  |
+  v
+Courier calls use server-side token only
+```
+
+Pathao test connection flow:
+
+```text
+Admin clicks Test Connection on a PATHAO courier account
+  |
+  v
+Server action loads courier account credentials server-side
+  |
+  v
+Backend rejects placeholder-only credentials with a clean admin message
+  |
+  v
+If real .env credentials exist, backend requests a Pathao access token
+  |
+  v
+Backend stores only CONFIGURED token placeholders and tokenExpiresAt
+  |
+  v
+Admin UI receives safe status, message, and tokenExpiresAt only
+```
+
+Token storage warning:
+
+- The test connection action must never return Pathao credentials, access tokens, or refresh tokens to browser code.
+- Until encryption is implemented, successful token tests may only store `CONFIGURED_*` token placeholders and `tokenExpiresAt` in `courier_accounts`.
+- Raw access and refresh tokens must not be persisted in plaintext database fields.
+- `PATHAO_API_BASE_URL` configures the Pathao API host; do not hardcode production credentials or secrets.
+- Encrypted DB credential storage remains a future upgrade; `.env` secrets are the current source for real Pathao connection tests.
+
+Future city/zone/area sync:
+
+- Add a server-side sync job for Pathao city, zone, and area endpoints after credentials are encrypted.
+- Upsert synced IDs into `courier_area_mappings` without changing checkout or storefront routes.
+- Keep manual overrides available for unmapped or renamed delivery areas.
+- Never trust browser-submitted Pathao IDs without backend validation against active mappings.
+
+Next Pathao integration steps:
+
+- Implement encrypted credential and token storage before using real merchant secrets.
+- Add city/zone/area sync after the auth test is stable.
+- Add phone-based fraud/risk checks only after data source and admin review rules are defined.
+- Add shipment creation only after order confirmation rules, area validation, and fraud-check dependencies are complete.
+
 Migration notes:
 
 - Pathao credentials must stay server-side only.
@@ -359,9 +477,45 @@ Future table ideas:
 
 - `customer_risk_checks`
 
+Implemented foundation table:
+
+- `customer_risk_checks`
+
+Risk levels:
+
+- `LOW`
+- `MEDIUM`
+- `HIGH`
+- `UNKNOWN`
+
+Current implementation:
+
+- Admin order details can create a phone-based risk check from the Fraud/Risk panel.
+- If `PATHAO_FRAUD_CHECK_ENABLED` is not `true` or `PATHAO_FRAUD_CHECK_ENDPOINT` is not configured, the backend creates a placeholder `UNKNOWN` risk check with zero metrics.
+- Admin order details show the latest check for the order.
+- Admin customer details show the latest check by customer phone.
+- Risk checks are decision-support only and do not block, reject, confirm, or mutate orders automatically.
+
+Pathao risk boundary:
+
+- `PATHAO_FRAUD_CHECK_ENABLED=false` keeps the provider boundary disconnected.
+- `PATHAO_FRAUD_CHECK_ENDPOINT` enables a server-side-only endpoint call when explicitly configured.
+- Provider payloads are sanitized before storage so token, secret, password, credential, and authorization fields are redacted.
+- The risk boundary normalizes provider metrics into total, delivered, cancelled, returned, and success-rate fields.
+
+Placeholder risk calculation:
+
+- No data or no success rate: `UNKNOWN`.
+- Success rate `>= 80%`: `LOW`.
+- Success rate `>= 50%` and `< 80%`: `MEDIUM`.
+- Success rate `< 50%`: `HIGH`.
+- High cancelled/returned counts increase risk when those metrics are available.
+
 Migration notes:
 
 - Risk checks should be backend-generated.
+- Pathao history must only be queried server-side after valid encrypted Pathao credentials exist.
+- Courier shipment creation should depend on the latest internal fraud/risk check when a future business rule requires review before fulfillment.
 - Risk labels should guide admin review, not replace admin judgment unless a later business rule explicitly requires auto-rejection.
 - Do not trust risk labels or risk notes supplied by frontend requests.
 
@@ -405,11 +559,37 @@ Future table ideas:
 
 - `courier_shipments`
 
+Implemented foundation table:
+
+- `courier_shipments`
+
+Future shipment creation lifecycle:
+
+```text
+Order confirmed by admin
+  |
+  v
+Backend checks customer fraud/risk context if required
+  |
+  v
+Backend validates active courier account and area mapping
+  |
+  v
+Backend creates Pathao consignment server-side
+  |
+  v
+Courier shipment snapshot is saved with provider references
+  |
+  v
+Initial courier event is appended
+```
+
 Migration notes:
 
 - Shipment creation must run server-side.
 - Order address, customer phone, package weight, item value, and delivery method should be validated before calling Pathao.
 - Shipment creation should not rely on frontend-calculated delivery status.
+- Do not add real Pathao shipment creation until credential encryption, token refresh, area validation, and admin confirmation rules are complete.
 
 ## Phase 11: Shipment Tracking Sync
 
@@ -426,6 +606,17 @@ Backend should support:
 Future table ideas:
 
 - `courier_events`
+
+Implemented foundation table:
+
+- `courier_events`
+
+Future courier tracking sync:
+
+- Poll Pathao tracking/status endpoints or process trusted callbacks server-side only.
+- Record each provider status change in `courier_events` with sanitized payloads.
+- Map verified provider statuses to internal delivery statuses in a backend-owned service.
+- Reconcile duplicate or out-of-order tracking updates idempotently before mutating order delivery state.
 
 Migration notes:
 
