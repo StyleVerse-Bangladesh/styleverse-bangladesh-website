@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NEXT_DIST_DIR=.next-dev next dev",
-    "build": "cross-env NEXT_DIST_DIR=.next-build next build",
+    "build": "npx prisma generate && cross-env NEXT_DIST_DIR=.next-build next build",
+    "postinstall": "npx prisma generate",
     "start": "cross-env NEXT_DIST_DIR=.next-build next start",
     "lint": "eslint"
   },

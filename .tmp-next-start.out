@@ -1,4 +1,0 @@
-
-> styleverse-bangladesh@0.1.0 start
-> cross-env NEXT_DIST_DIR=.next-build next start -p 3105
-
