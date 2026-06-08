@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NEXT_DIST_DIR=.next-dev next dev",
-    "build": "npx prisma generate && cross-env NEXT_DIST_DIR=.next-build next build",
+    "dev": "next dev",
+    "build": "npx prisma generate && next build",
     "postinstall": "npx prisma generate",
-    "start": "cross-env NEXT_DIST_DIR=.next-build next start",
+    "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {

@@ -34,7 +34,6 @@ const imageCdnHostnames = (
   .filter((hostname, index, hostnames) => hostnames.indexOf(hostname) === index);
 
 const nextConfig: NextConfig = {
-  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   images: {
     formats: ["image/avif", "image/webp"],
     deviceSizes: [360, 414, 640, 768, 1024, 1280, 1536, 1920, 2048, 3840],
