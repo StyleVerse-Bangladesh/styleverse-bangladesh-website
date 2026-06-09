@@ -7,6 +7,8 @@ import {
 } from "@/data/category-taxonomy";
 import {
   flattenCategories,
+  getActiveBannerDatabaseCategories,
+  getActiveFeaturedDatabaseCategories,
   getDatabaseCategories,
 } from "@/data/category-db";
 
@@ -26,6 +28,24 @@ export async function getStorefrontCategoryByPath(path: string[]) {
   const categories = await getStorefrontCategories();
 
   return categories.find((category) => arePathsEqual(category.path, path));
+}
+
+export async function getStorefrontFeaturedCategories(): Promise<Category[]> {
+  try {
+    return getActiveFeaturedDatabaseCategories();
+  } catch (error) {
+    console.error("Featured category query failed:", error);
+    return [];
+  }
+}
+
+export async function getStorefrontBannerCategories(): Promise<Category[]> {
+  try {
+    return getActiveBannerDatabaseCategories();
+  } catch (error) {
+    console.error("Banner category query failed:", error);
+    return [];
+  }
 }
 
 export async function generateCategoryStaticParams(rootSlug: RootCategorySlug) {

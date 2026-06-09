@@ -290,6 +290,7 @@ model Category {
   icon           String?
   tone           String?
   featured       Boolean  @default(false)
+  featureInBanner Boolean @default(false) @map("feature_in_banner")
   seoTitle       String?  @map("seo_title")
   seoDescription String?  @map("seo_description")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -307,6 +308,7 @@ model Category {
   @@index([isActive])
   @@index([showInNav])
   @@index([showInFilter])
+  @@index([featureInBanner])
   @@map("categories")
 }
 

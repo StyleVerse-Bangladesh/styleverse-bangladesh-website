@@ -1,4 +1,9 @@
 import { mapHomepageDtoToHomepageContent } from "@/lib/api/adapters/homepage-adapter";
+import { getStorefrontBannerCategories } from "@/data/category-access";
+import {
+  rootCategorySlugs,
+  type Category,
+} from "@/data/category-taxonomy";
 import { assets, type WebpAssetFile } from "@/lib/constants/assets";
 import { HomepageSectionType, ProductStatus } from "@prisma/client";
 import type {
@@ -7,6 +12,14 @@ import type {
   HomepageSectionState,
 } from "@/lib/api/adapters/homepage-adapter";
 import type { HomepageContentDto } from "@/types/api/homepage.dto";
+
+const bannerCategoryGroupSize = 4;
+const bannerCategoryToneFallbacks = [
+  "from-zinc-950 to-zinc-600",
+  "from-neutral-800 to-zinc-300",
+  "from-slate-900 to-slate-500",
+  "from-stone-900 to-stone-300",
+];
 
 const staticHomepageContentDto: HomepageContentDto = {
   heroSlides: [
@@ -81,20 +94,26 @@ const staticHomepageContentDto: HomepageContentDto = {
 
 export async function getHomepageContent(): Promise<HomepageContent> {
   const staticContent = mapHomepageDtoToHomepageContent(staticHomepageContentDto);
+  let content = staticContent;
 
   try {
     const sections = await getHomepageSectionsFromDb();
     const activeSections = sections.filter(isCurrentlyActiveSection);
 
     if (!activeSections.length) {
-      return staticContent;
+      return applyBannerCategoryOverride(content);
     }
 
-    return mergeDbSectionsWithStaticFallback(sections, activeSections, staticContent);
+    content = mergeDbSectionsWithStaticFallback(
+      sections,
+      activeSections,
+      staticContent,
+    );
   } catch (error) {
     console.error("Homepage CMS query failed:", error);
-    return staticContent;
   }
+
+  return applyBannerCategoryOverride(content);
 }
 
 async function getHomepageSectionsFromDb() {
@@ -348,7 +367,13 @@ function mapCategoryGroups(sections: HomepageSectionRecord[]) {
   const groups = new Map<
     string,
     {
-      items: Array<{ href: string; label: string; sortOrder: number; tone: string }>;
+      items: Array<{
+        href: string;
+        image?: string;
+        label: string;
+        sortOrder: number;
+        tone: string;
+      }>;
       sortOrder: number;
       title: string;
     }
@@ -374,6 +399,7 @@ function mapCategoryGroups(sections: HomepageSectionRecord[]) {
 
       group.items.push({
         href: item.href || getCategoryHref(item.category?.path) || "#",
+        image: item.image ?? undefined,
         label: title,
         sortOrder: item.sortOrder,
         tone: readMetadataString(item.metadata, "tone") || "from-zinc-950 to-zinc-600",
@@ -390,10 +416,116 @@ function mapCategoryGroups(sections: HomepageSectionRecord[]) {
         .sort(sortBySortOrder)
         .map((item) => ({
           href: item.href,
+          image: item.image,
           label: item.label,
           tone: item.tone,
         })),
     }));
+}
+
+async function applyBannerCategoryOverride(content: HomepageContent) {
+  const bannerCategories = await getStorefrontBannerCategories();
+  const bannerItems = bannerCategories
+    .filter(isRoutableCategory)
+    .map(mapBannerCategoryToItem)
+    .filter(isDefined);
+
+  if (!bannerItems.length) {
+    return content;
+  }
+
+  return {
+    ...content,
+    categoryGroups: mergeBannerCategoryGroups(content.categoryGroups, bannerItems),
+  };
+}
+
+type BannerCategoryItem = {
+  href: string;
+  image?: string;
+  label: string;
+  tone: string;
+};
+
+function mapBannerCategoryToItem(
+  category: Category,
+  index: number,
+): BannerCategoryItem | null {
+  const href = getCategoryHref(category.path);
+
+  if (!href) {
+    return null;
+  }
+
+  return {
+    href,
+    image: category.image,
+    label: category.label,
+    tone:
+      category.tone ||
+      bannerCategoryToneFallbacks[index % bannerCategoryToneFallbacks.length],
+  };
+}
+
+function mergeBannerCategoryGroups(
+  groups: HomepageContent["categoryGroups"],
+  bannerItems: BannerCategoryItem[],
+) {
+  const bannerItemByHref = new Map(
+    bannerItems.map((item) => [normalizeHref(item.href), item]),
+  );
+  const matchedHrefs = new Set<string>();
+  const mergedGroups = groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => {
+      const normalizedHref = normalizeHref(item.href);
+      const bannerItem = bannerItemByHref.get(normalizedHref);
+
+      if (!bannerItem) {
+        return item;
+      }
+
+      matchedHrefs.add(normalizedHref);
+
+      return {
+        ...item,
+        image: bannerItem.image ?? item.image,
+        label: bannerItem.label || item.label,
+        tone: bannerItem.tone || item.tone,
+      };
+    }),
+  }));
+  const unmatchedItems = bannerItems.filter(
+    (item) => !matchedHrefs.has(normalizeHref(item.href)),
+  );
+
+  if (!unmatchedItems.length) {
+    return mergedGroups;
+  }
+
+  return [
+    ...mergedGroups,
+    ...mapBannerItemsToCategoryGroups(unmatchedItems),
+  ];
+}
+
+function mapBannerItemsToCategoryGroups(items: BannerCategoryItem[]) {
+  const groups = [];
+
+  for (let index = 0; index < items.length; index += bannerCategoryGroupSize) {
+    const chunk = items.slice(index, index + bannerCategoryGroupSize);
+    const groupNumber = index / bannerCategoryGroupSize;
+
+    groups.push({
+      title:
+        groupNumber === 0
+          ? "Featured Categories"
+          : `Featured Categories ${groupNumber + 1}`,
+      items: chunk,
+    });
+  }
+
+  return groups;
 }
 
 function mapProductCards(sections: HomepageSectionRecord[]) {
@@ -445,6 +577,22 @@ function mapRecommendedProductIds(sections: HomepageSectionRecord[]) {
 
 function getCategoryHref(path: string[] | undefined) {
   return path?.length ? `/${path.join("/")}` : null;
+}
+
+function normalizeHref(href: string) {
+  const trimmedHref = href.trim();
+
+  if (trimmedHref.length <= 1) {
+    return trimmedHref;
+  }
+
+  return trimmedHref.replace(/\/+$/, "");
+}
+
+function isRoutableCategory(category: Category) {
+  const rootSlug = category.path[0];
+
+  return rootCategorySlugs.includes(rootSlug as (typeof rootCategorySlugs)[number]);
 }
 
 function readFeatureIcon(metadata: unknown): HomepageFeature["icon"] {

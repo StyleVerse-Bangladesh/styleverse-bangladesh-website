@@ -33,6 +33,7 @@ export type Category = {
   icon?: string;
   tone?: string;
   featured?: boolean;
+  featureInBanner?: boolean;
   seo?: CategorySeo;
   children?: Category[];
 };
@@ -49,6 +50,7 @@ type CategorySeed = {
   icon?: string;
   tone?: string;
   featured?: boolean;
+  featureInBanner?: boolean;
   seo?: CategorySeo;
   children?: CategorySeed[];
 };
@@ -278,6 +280,7 @@ function buildCategoryTree(
       icon: item.icon,
       tone: item.tone,
       featured: item.featured,
+      featureInBanner: item.featureInBanner,
       seo: item.seo,
       children,
     };

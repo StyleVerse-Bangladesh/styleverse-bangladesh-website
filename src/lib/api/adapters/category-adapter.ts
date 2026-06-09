@@ -18,6 +18,7 @@ export function mapCategoryDtoToCategory(dto: CategoryDto): Category {
     icon: dto.icon,
     tone: dto.tone,
     featured: dto.featured,
+    featureInBanner: dto.featureInBanner,
     seo: dto.seo ? { ...dto.seo } : undefined,
     children: dto.children?.map(mapCategoryDtoToCategory),
   };

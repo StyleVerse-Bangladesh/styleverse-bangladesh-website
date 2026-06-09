@@ -1,11 +1,17 @@
 import type { MouseEventHandler } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import {
+  defaultImagePlaceholders,
+  getImageUrl,
+} from "@/lib/constants/assets";
 
 export type CategoryGroup = {
   title: string;
   items: Array<{
     label: string;
     href: string;
+    image?: string;
     tone: string;
   }>;
 };
@@ -38,7 +44,7 @@ export function CategoryGroupCard({
       <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5">
         {group.items.map((item) => (
           <Link
-            key={item.label}
+            key={item.href}
             href={item.href}
             className="group/item block rounded-md outline-none transition-transform duration-200 ease-out hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-black"
             draggable={itemDraggable}
@@ -47,9 +53,25 @@ export function CategoryGroupCard({
             <div
               className={`relative aspect-square overflow-hidden rounded-md bg-gradient-to-br ${item.tone} shadow-sm shadow-black/10 transition-[box-shadow,transform] duration-300 ease-out group-hover/item:scale-[1.015] group-hover/item:shadow-lg group-hover/item:shadow-black/20 sm:aspect-[4/3]`}
             >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_45%)] transition-transform duration-500 ease-out group-hover/item:scale-110" />
-              <div className="absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-white/20 opacity-0 blur-sm transition-[transform,opacity] duration-500 ease-out group-hover/item:translate-x-[420%] group-hover/item:opacity-100" />
-              <div className="absolute bottom-2 right-2 h-8 w-14 rounded-full bg-white/20 blur-md transition-transform duration-300 group-hover/item:scale-125" />
+              {item.image ? (
+                <>
+                  <Image
+                    alt={item.label}
+                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover/item:scale-105"
+                    fill
+                    sizes="(max-width: 767px) 80vw, (max-width: 1279px) 24vw, 12vw"
+                    src={getImageUrl(item.image, defaultImagePlaceholders.category)}
+                    unoptimized={isExternalImage(item.image)}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
+                </>
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.34),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_45%)] transition-transform duration-500 ease-out group-hover/item:scale-110" />
+                  <div className="absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-white/20 opacity-0 blur-sm transition-[transform,opacity] duration-500 ease-out group-hover/item:translate-x-[420%] group-hover/item:opacity-100" />
+                  <div className="absolute bottom-2 right-2 h-8 w-14 rounded-full bg-white/20 blur-md transition-transform duration-300 group-hover/item:scale-125" />
+                </>
+              )}
             </div>
             <p className="mt-2 text-center text-sm font-medium text-zinc-700 transition-colors group-hover/item:text-black sm:text-left">
               {item.label}
@@ -59,4 +81,8 @@ export function CategoryGroupCard({
       </div>
     </article>
   );
+}
+
+function isExternalImage(src: string) {
+  return /^https?:\/\//i.test(src);
 }

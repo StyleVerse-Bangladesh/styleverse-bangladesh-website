@@ -4,12 +4,21 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
-type CategoryBooleanField = "isActive" | "showInFilter" | "showInNav";
+type CategoryBooleanField =
+  | "featureInBanner"
+  | "featured"
+  | "isActive"
+  | "showInFilter"
+  | "showInNav";
 
 export type CategoryActionState = {
   message?: string;
   status?: "error" | "success";
   values?: {
+    featured?: boolean;
+    featureInBanner?: boolean;
+    icon?: string;
+    image?: string;
     isActive?: boolean;
     label?: string;
     parentId?: string;
@@ -23,6 +32,10 @@ export type CategoryActionState = {
 };
 
 type CategoryMutationInput = {
+  featured: boolean;
+  featureInBanner: boolean;
+  icon: string | null;
+  image: string | null;
   isActive: boolean;
   label: string;
   parentId: string | null;
@@ -83,6 +96,10 @@ export async function createCategoryAction(
   await db.category.create({
     data: {
       depth: metadata.depth,
+      featureInBanner: input.featureInBanner,
+      featured: input.featured,
+      icon: input.icon,
+      image: input.image,
       isActive: input.isActive,
       label: input.label,
       parentId: input.parentId,
@@ -98,7 +115,7 @@ export async function createCategoryAction(
     },
   });
 
-  revalidatePath("/admin/categories");
+  revalidateCategories();
 
   return {
     message: "Category created.",
@@ -189,6 +206,10 @@ export async function updateCategoryAction(
       where: { id },
       data: {
         depth: metadata.depth,
+        featureInBanner: input.featureInBanner,
+        featured: input.featured,
+        icon: input.icon,
+        image: input.image,
         isActive: input.isActive,
         label: input.label,
         parentId: input.parentId,
@@ -207,7 +228,7 @@ export async function updateCategoryAction(
     await updateDescendantCategories(tx, descendantUpdates);
   });
 
-  revalidatePath("/admin/categories");
+  revalidateCategories();
 
   return {
     message: "Category updated.",
@@ -267,7 +288,7 @@ export async function deleteCategoryAction(
     where: { id },
   });
 
-  revalidatePath("/admin/categories");
+  revalidateCategories();
 
   return {
     message: `${category.label} deleted.`,
@@ -283,6 +304,10 @@ function parseCategoryFormData(formData: FormData): CategoryMutationInput {
   const sortOrder = parseSortOrder(readRequiredString(formData, "sortOrder"));
 
   return {
+    featureInBanner: readBoolean(formData, "featureInBanner"),
+    featured: readBoolean(formData, "featured"),
+    icon: readNullableText(formData, "icon"),
+    image: readNullableText(formData, "image"),
     isActive: readBoolean(formData, "isActive"),
     label,
     parentId,
@@ -516,6 +541,10 @@ function errorState(
     status: "error",
     values: {
       isActive: input.isActive,
+      featureInBanner: input.featureInBanner,
+      featured: input.featured,
+      icon: input.icon ?? "",
+      image: input.image ?? "",
       label: input.label,
       parentId: input.parentId ?? "",
       seoDescription: input.seoDescription ?? "",
@@ -526,4 +555,13 @@ function errorState(
       sortOrder: String(input.sortOrder),
     },
   };
+}
+
+function revalidateCategories() {
+  try {
+    revalidatePath("/admin/categories");
+    revalidatePath("/");
+  } catch {
+    // Keep direct test invocations from failing outside Next's request store.
+  }
 }

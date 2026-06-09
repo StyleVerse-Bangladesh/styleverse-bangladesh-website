@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 
 type PrismaCategoryRecord = {
   depth: number;
+  featureInBanner: boolean;
   featured: boolean;
   icon: string | null;
   id: string;
@@ -26,6 +27,7 @@ export async function getDatabaseCategories(): Promise<Category[]> {
     orderBy: [{ depth: "asc" }, { sortOrder: "asc" }, { label: "asc" }],
     select: {
       depth: true,
+      featureInBanner: true,
       featured: true,
       icon: true,
       id: true,
@@ -46,6 +48,32 @@ export async function getDatabaseCategories(): Promise<Category[]> {
   });
 
   return buildCategoryTree(categories);
+}
+
+export async function getActiveFeaturedDatabaseCategories(): Promise<Category[]> {
+  const categories = await db.category.findMany({
+    orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+    select: categoryRecordSelect,
+    where: {
+      featured: true,
+      isActive: true,
+    },
+  });
+
+  return categories.map(mapPrismaCategoryToStorefrontCategory);
+}
+
+export async function getActiveBannerDatabaseCategories(): Promise<Category[]> {
+  const categories = await db.category.findMany({
+    orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+    select: categoryRecordSelect,
+    where: {
+      featureInBanner: true,
+      isActive: true,
+    },
+  });
+
+  return categories.map(mapPrismaCategoryToStorefrontCategory);
 }
 
 export function flattenCategories(categories: Category[]): Category[] {
@@ -87,6 +115,7 @@ export function mapPrismaCategoryToStorefrontCategory(
 ): Category {
   return {
     depth: category.depth,
+    featureInBanner: category.featureInBanner,
     featured: category.featured,
     icon: category.icon ?? undefined,
     id: category.id,
@@ -124,3 +153,24 @@ function sortCategoryTree(categories: Category[]) {
 function sortCategories(left: Category, right: Category) {
   return left.sortOrder - right.sortOrder || left.label.localeCompare(right.label);
 }
+
+const categoryRecordSelect = {
+  depth: true,
+  featureInBanner: true,
+  featured: true,
+  icon: true,
+  id: true,
+  image: true,
+  isActive: true,
+  label: true,
+  parentId: true,
+  path: true,
+  rootSlug: true,
+  seoDescription: true,
+  seoTitle: true,
+  showInFilter: true,
+  showInNav: true,
+  slug: true,
+  sortOrder: true,
+  tone: true,
+} as const;

@@ -16,6 +16,7 @@ export type CategoryDto = {
   icon?: string;
   tone?: string;
   featured?: boolean;
+  featureInBanner?: boolean;
   seo?: CategorySeo;
   children?: CategoryDto[];
 };

@@ -19,7 +19,11 @@ export default async function AdminCategoriesPage() {
         },
       },
       depth: true,
+      featureInBanner: true,
+      featured: true,
       id: true,
+      icon: true,
+      image: true,
       isActive: true,
       label: true,
       parent: {
@@ -37,6 +41,7 @@ export default async function AdminCategoriesPage() {
       showInNav: true,
       slug: true,
       sortOrder: true,
+      tone: true,
     },
   });
 
@@ -44,7 +49,11 @@ export default async function AdminCategoriesPage() {
     .map<CategoryAdminItem>((category) => ({
       childCount: category._count.children,
       depth: category.depth,
+      featureInBanner: category.featureInBanner,
+      featured: category.featured,
       id: category.id,
+      icon: category.icon,
+      image: category.image,
       isActive: category.isActive,
       label: category.label,
       parentId: category.parentId,
@@ -60,6 +69,7 @@ export default async function AdminCategoriesPage() {
       showInNav: category.showInNav,
       slug: category.slug,
       sortOrder: category.sortOrder,
+      tone: category.tone,
     }))
     .sort((left, right) => {
       const pathCompare = left.pathKey.localeCompare(right.pathKey);

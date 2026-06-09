@@ -61,6 +61,7 @@ export function mapHomepageDtoToHomepageContent(
         .map((item) => ({
           label: item.label,
           href: item.href,
+          image: item.image,
           tone: item.tone,
         })),
     })),

@@ -17,6 +17,7 @@ export type HomepageCategoryGroupDto = {
     id: string;
     label: string;
     href: string;
+    image?: string;
     tone: string;
     sortOrder: number;
   }>;

@@ -333,6 +333,7 @@ function buildCategorySeedData(
 ) {
   return {
     depth: category.depth,
+    featureInBanner: category.featureInBanner ?? false,
     featured: category.featured ?? false,
     icon: category.icon ?? null,
     image: category.image ?? null,
