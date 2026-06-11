@@ -35,6 +35,12 @@ if (!connectionString) {
 
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
+const defaultAdminSeedEmail = "admin@styleverse.local";
+const defaultAdminSeedPassword = "ChangeMe123!";
+const adminSeedEmail =
+  process.env.ADMIN_SEED_EMAIL?.trim().toLowerCase() || defaultAdminSeedEmail;
+const adminSeedPassword =
+  process.env.ADMIN_SEED_PASSWORD || defaultAdminSeedPassword;
 
 type SeedProductVariant = StorefrontProductVariant & {
   sku?: string;
@@ -136,10 +142,10 @@ async function main() {
   );
 
   const superAdminRole = requireRole(seededRoles, "SUPER_ADMIN");
-  const superAdminPasswordHash = await hashPassword("ChangeMe123!");
+  const superAdminPasswordHash = await hashPassword(adminSeedPassword);
 
   await prisma.adminUser.upsert({
-    where: { email: "admin@styleverse.local" },
+    where: { email: adminSeedEmail },
     update: {
       name: "StyleVerse Super Admin",
       passwordHash: superAdminPasswordHash,
@@ -148,7 +154,7 @@ async function main() {
     },
     create: {
       name: "StyleVerse Super Admin",
-      email: "admin@styleverse.local",
+      email: adminSeedEmail,
       passwordHash: superAdminPasswordHash,
       roleId: superAdminRole.id,
       isActive: true,
@@ -286,6 +292,7 @@ async function main() {
       `and ${productStats.preorders} preorder settings.`,
       `Seeded ${homepageStats.sections} homepage sections and ${homepageStats.items} homepage items.`,
       `Seeded ${couponCount} coupons.`,
+      `Seeded admin user ${adminSeedEmail}.`,
       "Seeded placeholder Pathao courier account.",
     ].join(" "),
   );
