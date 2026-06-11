@@ -1,12 +1,14 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Boxes,
+  ChevronDown,
   ClipboardList,
   FolderTree,
+  Grid3X3,
   Home,
   Image as ImageIcon,
   LayoutDashboard,
@@ -16,6 +18,7 @@ import {
   Package,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Store,
   TicketPercent,
   UserCog,
@@ -42,18 +45,38 @@ type AdminShellProps = {
   children: ReactNode;
 };
 
-type AdminNavItem = {
+type AdminNavLinkItem = {
   href: string;
   icon: LucideIcon;
   label: string;
   superAdminOnly?: boolean;
 };
 
-const adminNavItems = [
+type AdminNavGroupItem = {
+  children: AdminNavLinkItem[];
+  icon: LucideIcon;
+  label: string;
+  superAdminOnly?: boolean;
+};
+
+type AdminNavItem = AdminNavLinkItem | AdminNavGroupItem;
+
+const adminNavItems: AdminNavItem[] = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/admin/products", icon: Package, label: "Products" },
+  {
+    children: [
+      { href: "/admin/categories", icon: FolderTree, label: "Categories" },
+      {
+        href: "/admin/shop-by-categories",
+        icon: Grid3X3,
+        label: "Shop by Category",
+      },
+    ],
+    icon: SlidersHorizontal,
+    label: "Product Config",
+  },
   { href: "/admin/media", icon: ImageIcon, label: "Media" },
-  { href: "/admin/categories", icon: FolderTree, label: "Categories" },
   { href: "/admin/inventory", icon: Boxes, label: "Inventory" },
   { href: "/admin/orders", icon: ClipboardList, label: "Orders" },
   { href: "/admin/coupons", icon: TicketPercent, label: "Coupons" },
@@ -72,7 +95,7 @@ const adminNavItems = [
     label: "Roles & Permissions",
     superAdminOnly: true,
   },
-] satisfies AdminNavItem[];
+];
 
 function isActiveRoute(pathname: string, href: string) {
   if (href === "/admin") {
@@ -80,6 +103,10 @@ function isActiveRoute(pathname: string, href: string) {
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function isNavGroupItem(item: AdminNavItem): item is AdminNavGroupItem {
+  return "children" in item;
 }
 
 export function AdminShell({ admin, children }: AdminShellProps) {
@@ -173,6 +200,18 @@ function AdminNavList({
   return (
     <nav className="grid gap-1 px-3 py-4" aria-label="Admin navigation">
       {visibleItems.map((item) => {
+        if (isNavGroupItem(item)) {
+          return (
+            <AdminNavGroup
+              closeOnSelect={closeOnSelect}
+              item={item}
+              key={item.label}
+              pathname={pathname}
+              roleSlug={roleSlug}
+            />
+          );
+        }
+
         const Icon = item.icon;
         const active = isActiveRoute(pathname, item.href);
         const link = (
@@ -207,6 +246,108 @@ function AdminNavList({
         return <div key={item.href}>{link}</div>;
       })}
     </nav>
+  );
+}
+
+function AdminNavGroup({
+  closeOnSelect,
+  item,
+  pathname,
+  roleSlug,
+}: {
+  closeOnSelect: boolean;
+  item: AdminNavGroupItem;
+  pathname: string;
+  roleSlug: string;
+}) {
+  const visibleChildren = item.children.filter(
+    (child) => !child.superAdminOnly || roleSlug === "SUPER_ADMIN",
+  );
+  const hasActiveChild = visibleChildren.some((child) =>
+    isActiveRoute(pathname, child.href),
+  );
+  const [open, setOpen] = useState(hasActiveChild);
+  const Icon = item.icon;
+
+  useEffect(() => {
+    if (hasActiveChild) {
+      setOpen(true);
+    }
+  }, [hasActiveChild]);
+
+  if (visibleChildren.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-md">
+      <button
+        type="button"
+        className={cn(
+          "flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold text-white/70 transition hover:bg-white/10 hover:text-white",
+          hasActiveChild &&
+            "bg-white text-zinc-950 shadow-sm shadow-black/20 hover:bg-white hover:text-zinc-950",
+        )}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Icon
+          className={cn(
+            "h-4 w-4 shrink-0 text-white/50",
+            hasActiveChild && "text-sky-600",
+          )}
+          aria-hidden="true"
+        />
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-white/45 transition-transform",
+            open && "rotate-180",
+            hasActiveChild && "text-zinc-500",
+          )}
+          aria-hidden="true"
+        />
+      </button>
+
+      {open ? (
+        <div className="mt-1 grid gap-1 border-l border-white/10 py-1 pl-3 ml-5">
+          {visibleChildren.map((child) => {
+            const ChildIcon = child.icon;
+            const active = isActiveRoute(pathname, child.href);
+            const link = (
+              <Link
+                href={child.href}
+                className={cn(
+                  "flex min-h-10 items-center gap-3 rounded-md px-3 text-sm font-semibold text-white/60 transition hover:bg-white/10 hover:text-white",
+                  active &&
+                    "bg-white text-zinc-950 shadow-sm shadow-black/20 hover:bg-white hover:text-zinc-950",
+                )}
+                aria-current={active ? "page" : undefined}
+              >
+                <ChildIcon
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-white/45",
+                    active && "text-sky-600",
+                  )}
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 truncate">{child.label}</span>
+              </Link>
+            );
+
+            if (closeOnSelect) {
+              return (
+                <SheetClose asChild key={child.href}>
+                  {link}
+                </SheetClose>
+              );
+            }
+
+            return <div key={child.href}>{link}</div>;
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
