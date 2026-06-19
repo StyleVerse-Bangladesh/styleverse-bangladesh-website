@@ -20,7 +20,10 @@ export function SiteBreadcrumb({ items, className }: SiteBreadcrumbProps) {
   return (
     <nav
       aria-label="Breadcrumb"
-      className={cn("border-b border-black/5 bg-white", className)}
+      className={cn(
+        "border-b border-black/5 bg-white md:bg-transparent",
+        className,
+      )}
     >
       <div className={cn(siteContainerClassName, "min-w-0")}>
         <ol className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap py-2.5 text-xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:text-sm">

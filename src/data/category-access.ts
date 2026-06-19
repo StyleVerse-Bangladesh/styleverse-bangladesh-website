@@ -1,4 +1,6 @@
 import {
+  buildCategoryHref,
+  categoryTreeToNavigationItems,
   getCategoryStaticParams as getStaticCategoryStaticParams,
   getRootCategories as getStaticRootCategories,
   rootCategorySlugs,
@@ -11,11 +13,31 @@ import {
   getActiveFeaturedDatabaseCategories,
   getDatabaseCategories,
 } from "@/data/category-db";
+import type { NavItem } from "@/types/navigation";
+
+const standardRootCategorySlugs = new Set<string>(rootCategorySlugs);
 
 export async function getStorefrontCategoryTree(): Promise<Category[]> {
   const databaseCategories = await getDatabaseCategoryTreeIfEnabled();
 
   return databaseCategories.length ? databaseCategories : getStaticRootCategories();
+}
+
+export async function getStorefrontNavigation(): Promise<NavItem[]> {
+  const staticNavigation = categoryTreeToNavigationItems(getStaticRootCategories());
+
+  if (!isDatabaseCatalogEnabled()) {
+    return staticNavigation;
+  }
+
+  try {
+    const navigation = buildFeaturedNavigation(await getDatabaseCategories());
+
+    return navigation.length ? navigation : staticNavigation;
+  } catch (error) {
+    console.error("Database navigation query failed:", error);
+    return staticNavigation;
+  }
 }
 
 export async function getStorefrontCategories(): Promise<Category[]> {
@@ -93,4 +115,64 @@ function hasAllRootCategories(categories: Category[]) {
 
 function arePathsEqual(left: string[], right: string[]) {
   return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
+function buildFeaturedNavigation(categories: Category[]): NavItem[] {
+  const rootCategoriesBySlug = new Map(
+    categories
+      .filter((category) => category.depth === 0)
+      .map((category) => [category.slug, category]),
+  );
+
+  return rootCategorySlugs
+    .map((rootSlug) => rootCategoriesBySlug.get(rootSlug))
+    .filter((category): category is Category => Boolean(category))
+    .filter((category) => {
+      if (!category.isActive || !standardRootCategorySlugs.has(category.slug)) {
+        return false;
+      }
+
+      return category.featured || hasFeaturedDescendant(category);
+    })
+    .map((category) => ({
+      label: category.label.toUpperCase(),
+      href: buildCategoryHref(category),
+      menuKey: category.slug,
+      children: buildFeaturedNavigationChildren(category.children ?? []),
+    }))
+    .map((item) => (item.children?.length ? item : { ...item, children: undefined }));
+}
+
+function buildFeaturedNavigationChildren(categories: Category[]): NavItem[] {
+  return categories.flatMap((category) => {
+    if (!category.isActive) {
+      return [];
+    }
+
+    const children = buildFeaturedNavigationChildren(category.children ?? []);
+
+    if (!category.featured) {
+      return children;
+    }
+
+    const item: NavItem = {
+      label: category.label,
+      href: buildCategoryHref(category),
+    };
+
+    if (children.length) {
+      item.children = children;
+    }
+
+    return [item];
+  });
+}
+
+function hasFeaturedDescendant(category: Category): boolean {
+  return Boolean(
+    category.children?.some(
+      (child) =>
+        child.isActive && (child.featured || hasFeaturedDescendant(child)),
+    ),
+  );
 }

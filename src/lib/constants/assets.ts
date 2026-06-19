@@ -1,7 +1,4 @@
 const imageRoot = "/images";
-const imageBaseUrl = normalizeImageBaseUrl(
-  process.env.NEXT_PUBLIC_IMAGE_BASE_URL,
-);
 
 export const assetFolders = {
   images: {
@@ -34,20 +31,6 @@ function assetPath(folder: string, fileName: string) {
   return `${folder}/${fileName}`;
 }
 
-function normalizeImageBaseUrl(baseUrl: string | undefined) {
-  const trimmedBaseUrl = baseUrl?.trim().replace(/\/+$/, "") ?? "";
-
-  if (!trimmedBaseUrl) {
-    return "";
-  }
-
-  if (/^https?:\/\//i.test(trimmedBaseUrl)) {
-    return trimmedBaseUrl;
-  }
-
-  return `https://${trimmedBaseUrl}`;
-}
-
 function isAbsoluteImageUrl(path: string) {
   return /^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(path);
 }
@@ -70,13 +53,7 @@ export function getImageUrl(
     return imagePath;
   }
 
-  const localPath = imagePath.startsWith("/") ? imagePath : `/${imagePath}`;
-
-  if (!imageBaseUrl) {
-    return localPath;
-  }
-
-  return `${imageBaseUrl}/${localPath.replace(/^\/+/, "")}`;
+  return imagePath.startsWith("/") ? imagePath : `/${imagePath}`;
 }
 
 // Format rules:

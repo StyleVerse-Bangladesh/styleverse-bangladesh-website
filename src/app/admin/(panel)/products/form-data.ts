@@ -33,8 +33,10 @@ export function getBlankProductFormValues(): ProductFormValues {
     name: "",
     price: "0.00",
     primaryCategoryId: "",
+    seoDescription: "",
+    seoTitle: "",
     slug: "",
-    status: "DRAFT",
+    status: "ARCHIVED",
     variants: [],
   };
 }
@@ -59,6 +61,8 @@ export async function getProductFormValues(id: string) {
       name: true,
       price: true,
       primaryCategoryId: true,
+      seoDescription: true,
+      seoTitle: true,
       productCategories: {
         select: {
           categoryId: true,
@@ -121,6 +125,8 @@ export async function getProductFormValues(id: string) {
     name: product.name,
     price: formatDecimal(Number(product.price)),
     primaryCategoryId,
+    seoDescription: product.seoDescription ?? "",
+    seoTitle: product.seoTitle ?? "",
     slug: product.slug,
     status: product.status satisfies ProductFormStatus,
     variants: product.variants.map<ProductFormVariant>((variant) => ({

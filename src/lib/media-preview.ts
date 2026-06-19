@@ -1,6 +1,9 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
-import { buildHighQualityDeliveryUrl } from "@/lib/cloudinary";
+import {
+  buildCloudinaryDeliveryUrl,
+  buildCloudinaryThumbnailUrl,
+} from "@/lib/cloudinary";
 
 export type MediaPreviewInput = {
   publicId: string | null;
@@ -23,16 +26,17 @@ export async function getMediaPreviewUrl(
   file: MediaPreviewInput,
 ): Promise<MediaPreviewInfo> {
   if (isCloudinaryMedia(file)) {
-    const previewUrl = getCloudinaryPreviewUrl(file);
+    const mediaUrl = getCloudinaryMediaUrl(file);
+    const previewUrl = getCloudinaryPreviewUrl(file) ?? mediaUrl;
 
     return {
       isCloudinary: true,
       isLegacyLocal: false,
       isLegacyLocalMissing: false,
-      mediaUrl: previewUrl,
+      mediaUrl,
       previewUrl,
       sourceLabel: "Cloudinary",
-      warning: previewUrl ? null : "Cloudinary URL is missing.",
+      warning: mediaUrl ? null : "Cloudinary URL is missing.",
     };
   }
 
@@ -61,20 +65,28 @@ export async function getMediaPreviewUrl(
   };
 }
 
-function getCloudinaryPreviewUrl(file: MediaPreviewInput) {
-  if (isCloudinaryUrl(file.url)) {
-    return file.url;
-  }
-
+function getCloudinaryMediaUrl(file: MediaPreviewInput) {
   if (file.publicId) {
     try {
-      return buildHighQualityDeliveryUrl(file.publicId);
+      return buildCloudinaryDeliveryUrl(file.publicId);
     } catch {
-      // Fall back to the persisted secure URL when env is not available.
+      // Fall back to persisted URLs when env is not available.
     }
   }
 
-  return file.secureUrl || null;
+  return firstUsableUrl(file.secureUrl, file.url);
+}
+
+function getCloudinaryPreviewUrl(file: MediaPreviewInput) {
+  if (file.publicId) {
+    try {
+      return buildCloudinaryThumbnailUrl(file.publicId);
+    } catch {
+      // Fall back to persisted URLs when env is not available.
+    }
+  }
+
+  return firstUsableUrl(file.secureUrl, file.url);
 }
 
 function isCloudinaryMedia(file: MediaPreviewInput) {
@@ -88,6 +100,10 @@ function isCloudinaryMedia(file: MediaPreviewInput) {
 
 function isCloudinaryUrl(value: string | null) {
   return Boolean(value && /^https:\/\/res\.cloudinary\.com\//i.test(value));
+}
+
+function firstUsableUrl(...values: Array<string | null>) {
+  return values.find((value) => value && !value.includes(`fl_${"strip"}`)) ?? null;
 }
 
 function isLocalUploadUrl(value: string) {

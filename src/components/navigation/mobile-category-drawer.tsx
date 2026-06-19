@@ -10,12 +10,17 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { mainNavigation } from "@/lib/constants/navigation";
+import { getNavigationItems } from "@/lib/constants/navigation";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/ui-store";
 import type { NavItem } from "@/types/navigation";
 
-export function MobileCategoryDrawer() {
+export function MobileCategoryDrawer({
+  navigation,
+}: {
+  navigation?: NavItem[];
+}) {
+  const navigationItems = getNavigationItems(navigation);
   const open = useUiStore((state) => state.isMobileCategoryDrawerOpen);
   const setOpen = useUiStore((state) => state.setMobileCategoryDrawerOpen);
 
@@ -55,7 +60,7 @@ export function MobileCategoryDrawer() {
           className="grid max-h-[calc(100vh-5rem-env(safe-area-inset-bottom))] gap-1 overflow-y-auto px-3 py-4"
           aria-label="Mobile categories"
         >
-          {mainNavigation.map((item) => (
+          {navigationItems.map((item) => (
             <CategoryDrawerItem key={item.href} item={item} />
           ))}
         </nav>

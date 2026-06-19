@@ -48,7 +48,10 @@ export function ProductYouMayLikeSection({
   }
 
   return (
-    <section className="bg-white pb-10 pt-0 sm:pb-14 sm:pt-2" aria-label="Product you may like">
+    <section
+      className="bg-white pb-10 pt-0 sm:pb-14 sm:pt-2 md:bg-transparent"
+      aria-label="Product you may like"
+    >
       <div className={siteContainerClassName}>
         <div className="relative border-b border-black/10 pb-2.5 text-center sm:pb-5">
           <HomeSectionHeading>{title}</HomeSectionHeading>

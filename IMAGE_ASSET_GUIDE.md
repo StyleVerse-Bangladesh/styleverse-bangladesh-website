@@ -43,21 +43,26 @@ Use `.png` or `.ico` only for app/browser icons:
 - `public/favicon/` for public favicon/app icon source files
 - `src/app/favicon.ico`, `src/app/icon.png`, and `src/app/apple-icon.png` for Next.js App Router icon routes
 
-## CDN Usage
+## Image Delivery
 
 Image paths should stay written as project-relative paths such as `/images/products/black-drop-shoulder-tshirt.webp`. Components and asset helpers should pass ecommerce raster images through `getImageUrl()` from `src/lib/constants/assets.ts`.
 
-By default, `getImageUrl("/images/products/tshirt.webp")` returns `/images/products/tshirt.webp`, so local files in `public/` continue to work.
+`getImageUrl("/images/products/tshirt.webp")` returns `/images/products/tshirt.webp`, so local files in `public/` continue to work. Relative paths such as `images/products/tshirt.webp` are normalized to `/images/products/tshirt.webp`.
 
-To switch ecommerce images to a CDN later, set `NEXT_PUBLIC_IMAGE_BASE_URL`:
+Uploaded admin media is stored in Cloudinary. Where applicable, the app stores the Cloudinary delivery `url`, original `secureUrl`, and `publicId` so media can be previewed, selected, and deleted through the existing admin flow.
 
-```env
-NEXT_PUBLIC_IMAGE_BASE_URL=https://cdn.styleversebd.com
-```
+Cloudinary full URLs such as `https://res.cloudinary.com/...` are supported alongside local public paths such as `/images/...` and `/logo/...`. The Next.js image config allows `res.cloudinary.com`; when `CLOUDINARY_CLOUD_NAME` is configured, that remote pattern is restricted to the configured cloud's image upload path.
 
-Then the same path resolves to `https://cdn.styleversebd.com/images/products/tshirt.webp`.
+The Cloudinary server credentials are:
 
-Add the CDN hostname to `NEXT_PUBLIC_IMAGE_CDN_HOSTNAMES` or `IMAGE_CDN_HOSTNAMES` when using remote images with Next.js Image. The Next config also reads the hostname from `NEXT_PUBLIC_IMAGE_BASE_URL`.
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `CLOUDINARY_FOLDER`
+
+`CLOUDINARY_API_SECRET` must remain server-side only. Do not expose Cloudinary API credentials through `NEXT_PUBLIC_` variables.
+
+The old custom image CDN environment variables are no longer used. Legacy `/uploads/media/...` database rows are unrelated to this env cleanup and should be handled separately if those files need migration.
 
 Logos, icons, favicon files, and App Router icon files can remain local unless the brand asset workflow changes later.
 

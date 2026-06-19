@@ -301,6 +301,8 @@ model Category {
   primaryProducts   Product[]             @relation("PrimaryProductCategory")
   productCategories ProductCategory[]
   homepageItems     HomepageSectionItem[]
+  homepageRootSlots HomepageCategorySlot[] @relation("HomepageCategorySlotRoot")
+  homepageSlotItems HomepageCategorySlotItem[] @relation("HomepageCategorySlotItemCategory")
 
   @@unique([parentId, slug])
   @@index([parentId])
@@ -893,6 +895,43 @@ model HomepageSectionItem {
   @@index([campaignId])
   @@index([sortOrder])
   @@map("homepage_section_items")
+}
+
+model HomepageCategorySlot {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  position       Int
+  title          String
+  rootCategoryId String   @map("root_category_id") @db.Uuid
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rootCategory Category @relation("HomepageCategorySlotRoot", fields: [rootCategoryId], references: [id], onDelete: Restrict)
+  items        HomepageCategorySlotItem[]
+
+  @@unique([position])
+  @@index([rootCategoryId])
+  @@index([isActive])
+  @@map("homepage_category_slots")
+}
+
+model HomepageCategorySlotItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slotId        String   @map("slot_id") @db.Uuid
+  categoryId    String   @map("category_id") @db.Uuid
+  position      Int
+  labelOverride String?  @map("label_override")
+  imageOverride String?  @map("image_override")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  slot     HomepageCategorySlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  category Category             @relation("HomepageCategorySlotItemCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([slotId, position])
+  @@index([categoryId])
+  @@index([position])
+  @@map("homepage_category_slot_items")
 }
 
 model StoreSettings {

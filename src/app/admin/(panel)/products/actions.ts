@@ -46,6 +46,8 @@ type ProductMutationInput = {
   name: string;
   price: string;
   primaryCategoryId: string;
+  seoDescription: string | null;
+  seoTitle: string | null;
   slug: string;
   status: ProductStatus;
   variants: ProductVariantInput[];
@@ -73,6 +75,13 @@ export async function updateProductStatusAction(
 
   if (!product) {
     return errorState("Product no longer exists.");
+  }
+
+  if (
+    status !== ProductStatus.PUBLISHED &&
+    status !== ProductStatus.ARCHIVED
+  ) {
+    return errorState("Products can only be published or archived.");
   }
 
   await db.product.update({
@@ -108,6 +117,8 @@ export async function createProductAction(
         name: parsed.name,
         price: parsed.price,
         primaryCategoryId: parsed.primaryCategoryId,
+        seoDescription: parsed.seoDescription,
+        seoTitle: parsed.seoTitle,
         slug: parsed.slug,
         status: parsed.status,
       },
@@ -158,6 +169,8 @@ export async function updateProductAction(
         name: parsed.name,
         price: parsed.price,
         primaryCategoryId: parsed.primaryCategoryId,
+        seoDescription: parsed.seoDescription,
+        seoTitle: parsed.seoTitle,
         slug: parsed.slug,
         status: parsed.status,
       },
@@ -175,56 +188,6 @@ export async function updateProductAction(
   };
 }
 
-export async function archiveProductAction(
-  _state: ProductActionState,
-  formData: FormData,
-): Promise<ProductActionState> {
-  const id = readRequiredString(formData, "id");
-
-  if (!id) {
-    return errorState("Product id is required.");
-  }
-
-  const product = await db.product.findUnique({
-    where: { id },
-    select: {
-      _count: {
-        select: {
-          orderItems: true,
-        },
-      },
-      name: true,
-      status: true,
-    },
-  });
-
-  if (!product) {
-    return errorState("Product no longer exists.");
-  }
-
-  if (product.status === ProductStatus.ARCHIVED) {
-    return {
-      message: `${product.name} is already archived.`,
-      status: "success",
-    };
-  }
-
-  await db.product.update({
-    where: { id },
-    data: { status: ProductStatus.ARCHIVED },
-  });
-
-  revalidatePath("/admin/products");
-
-  return {
-    message:
-      product._count.orderItems > 0
-        ? `${product.name} has order history, so it was archived instead of deleted.`
-        : `${product.name} archived.`,
-    status: "success",
-  };
-}
-
 async function parseAndValidateProductForm(
   formData: FormData,
   productId?: string,
@@ -238,6 +201,8 @@ async function parseAndValidateProductForm(
   const compareAtPrice = parseOptionalDecimalInput(
     readRequiredString(formData, "compareAtPrice"),
   );
+  const seoDescription = readNullableString(formData, "seoDescription");
+  const seoTitle = readNullableString(formData, "seoTitle");
   const primaryCategoryId = readRequiredString(formData, "primaryCategoryId");
   const additionalCategoryIds = uniqueStrings(
     formData.getAll("additionalCategoryIds").map((value) => String(value)),
@@ -253,8 +218,11 @@ async function parseAndValidateProductForm(
     return errorState("Product slug is required.");
   }
 
-  if (!status) {
-    return errorState("Choose a valid product status.");
+  if (
+    status !== ProductStatus.PUBLISHED &&
+    status !== ProductStatus.ARCHIVED
+  ) {
+    return errorState("Products can only be published or archived.");
   }
 
   if (!gender) {
@@ -309,6 +277,8 @@ async function parseAndValidateProductForm(
     name,
     price,
     primaryCategoryId,
+    seoDescription,
+    seoTitle,
     slug,
     status,
     variants,

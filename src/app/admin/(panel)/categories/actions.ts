@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
+import { rootCategorySlugs } from "@/data/category-taxonomy";
 import { db } from "@/lib/db";
 
 type CategoryBooleanField =
@@ -561,6 +562,10 @@ function revalidateCategories() {
   try {
     revalidatePath("/admin/categories");
     revalidatePath("/");
+    revalidatePath("/", "layout");
+    for (const rootSlug of rootCategorySlugs) {
+      revalidatePath(`/${rootSlug}`);
+    }
   } catch {
     // Keep direct test invocations from failing outside Next's request store.
   }

@@ -5,15 +5,17 @@ import type { ReactNode } from "react";
 import { Grid3X3, Home, Search, ShoppingBag, UserRound } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useCartSummary } from "@/hooks/use-cart-summary";
-import { mainNavigation } from "@/lib/constants/navigation";
+import { getNavigationItems } from "@/lib/constants/navigation";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/ui-store";
+import type { NavItem } from "@/types/navigation";
 
 const navItemClassName =
   "relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium text-black/75 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2";
 
-export function MobileBottomNav() {
+export function MobileBottomNav({ navigation }: { navigation?: NavItem[] }) {
   const pathname = usePathname();
+  const navigationItems = getNavigationItems(navigation);
   const { itemCount } = useCartSummary();
   const setCategoryDrawerOpen = useUiStore(
     (state) => state.setMobileCategoryDrawerOpen,
@@ -35,7 +37,7 @@ export function MobileBottomNav() {
   );
   const categoryActive =
     categoryDrawerOpen ||
-    mainNavigation.some(
+    navigationItems.some(
       (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
     );
 
@@ -108,12 +110,12 @@ export function MobileBottomNav() {
             (authModalOpen || pathname === "/login") && "text-black",
           )}
           onClick={() => setAuthModalOpen(true)}
-          aria-label="Open account"
+          aria-label="Open profile"
           aria-expanded={authModalOpen}
           aria-controls="mobile-auth-modal"
         >
           <UserRound className="h-5 w-5" />
-          <span>Account</span>
+          <span>Profile</span>
         </button>
       </div>
     </nav>

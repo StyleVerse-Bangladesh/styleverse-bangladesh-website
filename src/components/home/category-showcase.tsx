@@ -59,7 +59,10 @@ export function CategoryShowcase({
   }
 
   return (
-    <section className="bg-white py-5 sm:py-12" aria-label="Categories">
+    <section
+      className="bg-white py-5 sm:py-12 md:bg-transparent"
+      aria-label="Categories"
+    >
       <div className={siteContainerClassName}>
         <div className="relative border-b border-black/10 pb-2.5 text-center sm:pb-5">
           <HomeSectionHeading>{title}</HomeSectionHeading>

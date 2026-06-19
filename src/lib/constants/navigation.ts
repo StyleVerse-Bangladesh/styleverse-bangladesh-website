@@ -8,8 +8,15 @@ export const mainNavigation: NavItem[] = categoryTreeToNavigationItems();
 export const menNavigationTree: NavItem[] =
   mainNavigation.find((item) => item.menuKey === "men")?.children ?? [];
 
-export function findNavigationItemByMenuKey(menuKey: string) {
-  return mainNavigation.find((item) => item.menuKey === menuKey);
+export function getNavigationItems(navigation?: NavItem[]) {
+  return navigation?.length ? navigation : mainNavigation;
+}
+
+export function findNavigationItemByMenuKey(
+  menuKey: string,
+  navigation?: NavItem[],
+) {
+  return getNavigationItems(navigation).find((item) => item.menuKey === menuKey);
 }
 
 export function flattenNavigationItems(items: NavItem[]): NavItem[] {
@@ -19,6 +26,8 @@ export function flattenNavigationItems(items: NavItem[]): NavItem[] {
   ]);
 }
 
-export function findNavigationItemByHref(href: string) {
-  return flattenNavigationItems(mainNavigation).find((item) => item.href === href);
+export function findNavigationItemByHref(href: string, navigation?: NavItem[]) {
+  return flattenNavigationItems(getNavigationItems(navigation)).find(
+    (item) => item.href === href,
+  );
 }

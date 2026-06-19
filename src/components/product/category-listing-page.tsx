@@ -10,18 +10,23 @@ import {
 import type { ListingSearchParams } from "@/types/listing";
 import type { BreadcrumbItem } from "@/components/shared/site-breadcrumb";
 import { ListingPageShell } from "./listing-page-shell";
-import { ProductListing } from "./product-listing";
+import {
+  ProductListing,
+  type ProductListingVariant,
+} from "./product-listing";
 
 type CategoryListingPageProps = {
   rootSlug: RootCategorySlug;
   slug?: string[];
   searchParams?: Promise<ListingSearchParams>;
+  listingVariant?: ProductListingVariant;
 };
 
 export async function CategoryListingPage({
   rootSlug,
   slug = [],
   searchParams,
+  listingVariant = "desktop-filter-sidebar",
 }: CategoryListingPageProps) {
   const resolvedSearchParams = await searchParams;
   const [listingData, categories] = await Promise.all([
@@ -46,6 +51,7 @@ export async function CategoryListingPage({
         filters={listingData.filters}
         facets={listingData.facets}
         basePath={listingData.basePath}
+        variant={listingVariant}
       />
     </ListingPageShell>
   );

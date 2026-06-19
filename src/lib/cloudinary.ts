@@ -12,6 +12,14 @@ export type CloudinaryUploadResult = {
   width: number;
 };
 
+type CloudinaryDeliveryOptions = {
+  crop?: string;
+  gravity?: string;
+  height?: number;
+  quality?: string;
+  width?: number;
+};
+
 type CloudinaryConfig = {
   apiKey: string;
   apiSecret: string;
@@ -72,7 +80,18 @@ export async function uploadProductImageToCloudinary({
     folder: config.folder,
     public_id: generateProductPublicId(),
   });
-  const deliveryUrl = buildHighQualityDeliveryUrl(response.public_id);
+  const publicId = response.public_id?.trim();
+  const secureUrl = response.secure_url?.trim();
+
+  if (!publicId) {
+    throw new Error("Cloudinary upload returned no public id.");
+  }
+
+  if (!secureUrl) {
+    throw new Error("Cloudinary upload returned no secure URL.");
+  }
+
+  const deliveryUrl = buildCloudinaryDeliveryUrl(publicId);
 
   return {
     bytes: response.bytes,
@@ -80,8 +99,8 @@ export async function uploadProductImageToCloudinary({
     folder: config.folder,
     format: response.format,
     height: response.height,
-    publicId: response.public_id,
-    secureUrl: response.secure_url,
+    publicId,
+    secureUrl,
     width: response.width,
   };
 }
@@ -99,23 +118,53 @@ export async function destroyCloudinaryImage(publicId: string) {
   });
 }
 
-export function buildHighQualityDeliveryUrl(publicId: string) {
+export function buildCloudinaryDeliveryUrl(
+  publicId: string,
+  options: CloudinaryDeliveryOptions = {},
+) {
   const config = assertCloudinaryConfigured();
+  const trimmedPublicId = publicId.trim();
 
   if (!config) {
     throw new Error("Cloudinary environment variables are missing.");
   }
 
-  return cloudinary.url(publicId, {
+  if (!trimmedPublicId) {
+    throw new Error("Cloudinary public id is required.");
+  }
+
+  return cloudinary.url(trimmedPublicId, {
     secure: true,
     resource_type: "image",
     transformation: [
-      {
+      withoutUndefinedValues({
+        crop: options.crop,
         fetch_format: "auto",
-        flags: "strip",
-        quality: "auto:best",
-      },
+        gravity: options.gravity,
+        height: options.height,
+        quality: options.quality ?? "auto:good",
+        width: options.width,
+      }),
     ],
+  });
+}
+
+export function buildCloudinaryThumbnailUrl(
+  publicId: string,
+  options: CloudinaryDeliveryOptions = {},
+) {
+  return buildCloudinaryDeliveryUrl(publicId, {
+    crop: options.crop ?? "fill",
+    gravity: options.gravity ?? "auto",
+    height: options.height ?? 160,
+    quality: options.quality ?? "auto:eco",
+    width: options.width ?? 160,
+  });
+}
+
+export function buildHighQualityDeliveryUrl(publicId: string) {
+  return buildCloudinaryDeliveryUrl(publicId, {
+    quality: "auto:best",
   });
 }
 
@@ -138,6 +187,12 @@ function normalizeFolder(value: string) {
       .replace(/\\/g, "/")
       .replace(/^\/+|\/+$/g, "")
       .replace(/\/+/g, "/") || "styleverse"
+  );
+}
+
+function withoutUndefinedValues<T extends Record<string, unknown>>(value: T) {
+  return Object.fromEntries(
+    Object.entries(value).filter((entry) => entry[1] !== undefined),
   );
 }
 

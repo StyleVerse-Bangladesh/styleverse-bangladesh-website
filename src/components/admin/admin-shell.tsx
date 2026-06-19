@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   Package,
+  Plus,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
@@ -46,6 +47,7 @@ type AdminShellProps = {
 };
 
 type AdminNavLinkItem = {
+  activeMatch?: "exact" | "productList" | "section";
   href: string;
   icon: LucideIcon;
   label: string;
@@ -63,7 +65,25 @@ type AdminNavItem = AdminNavLinkItem | AdminNavGroupItem;
 
 const adminNavItems: AdminNavItem[] = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/admin/products", icon: Package, label: "Products" },
+  {
+    children: [
+      {
+        activeMatch: "exact",
+        href: "/admin/products/new",
+        icon: Plus,
+        label: "Add Product",
+      },
+      {
+        activeMatch: "productList",
+        href: "/admin/products",
+        icon: Package,
+        label: "All Products",
+      },
+      { href: "/admin/media", icon: ImageIcon, label: "Media" },
+    ],
+    icon: Package,
+    label: "Product",
+  },
   {
     children: [
       { href: "/admin/categories", icon: FolderTree, label: "Categories" },
@@ -76,7 +96,6 @@ const adminNavItems: AdminNavItem[] = [
     icon: SlidersHorizontal,
     label: "Product Config",
   },
-  { href: "/admin/media", icon: ImageIcon, label: "Media" },
   { href: "/admin/inventory", icon: Boxes, label: "Inventory" },
   { href: "/admin/orders", icon: ClipboardList, label: "Orders" },
   { href: "/admin/coupons", icon: TicketPercent, label: "Coupons" },
@@ -105,6 +124,21 @@ function isActiveRoute(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function isActiveNavLink(pathname: string, item: AdminNavLinkItem) {
+  if (item.activeMatch === "exact") {
+    return pathname === item.href;
+  }
+
+  if (item.activeMatch === "productList") {
+    return (
+      pathname === "/admin/products" ||
+      /^\/admin\/products\/[^/]+\/edit$/.test(pathname)
+    );
+  }
+
+  return isActiveRoute(pathname, item.href);
+}
+
 function isNavGroupItem(item: AdminNavItem): item is AdminNavGroupItem {
   return "children" in item;
 }
@@ -123,7 +157,7 @@ export function AdminShell({ admin, children }: AdminShellProps) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="border-b border-zinc-200 bg-white/95 shadow-sm shadow-black/5 backdrop-blur">
-            <div className="flex min-h-16 items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+            <div className="flex min-h-16 items-center gap-3 px-3 py-2.5 sm:px-4 lg:px-4 xl:px-5">
               <MobileMenu pathname={pathname} roleSlug={admin.roleSlug} />
 
               <div className="min-w-0">
@@ -160,7 +194,7 @@ export function AdminShell({ admin, children }: AdminShellProps) {
           </header>
 
           <main className="min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mx-auto w-full max-w-[96rem] px-3 py-4 sm:px-4 lg:px-4 xl:px-5">
               {children}
             </div>
           </main>
@@ -213,7 +247,7 @@ function AdminNavList({
         }
 
         const Icon = item.icon;
-        const active = isActiveRoute(pathname, item.href);
+        const active = isActiveNavLink(pathname, item);
         const link = (
           <Link
             href={item.href}
@@ -264,7 +298,7 @@ function AdminNavGroup({
     (child) => !child.superAdminOnly || roleSlug === "SUPER_ADMIN",
   );
   const hasActiveChild = visibleChildren.some((child) =>
-    isActiveRoute(pathname, child.href),
+    isActiveNavLink(pathname, child),
   );
   const [open, setOpen] = useState(hasActiveChild);
   const Icon = item.icon;
@@ -313,7 +347,7 @@ function AdminNavGroup({
         <div className="mt-1 grid gap-1 border-l border-white/10 py-1 pl-3 ml-5">
           {visibleChildren.map((child) => {
             const ChildIcon = child.icon;
-            const active = isActiveRoute(pathname, child.href);
+            const active = isActiveNavLink(pathname, child);
             const link = (
               <Link
                 href={child.href}

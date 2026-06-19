@@ -379,8 +379,11 @@ function getCategoryFilterOptionsFromCatalog(
   category: CategoryNode,
   categories: CategoryNode[],
 ) {
-  return categories
-    .filter((item) => item.parentId === category.id)
+  const categoryOptions = category.path.length
+    ? categories.filter((item) => item.parentId === category.id)
+    : getRootCategoriesFromCatalog(categories);
+
+  return categoryOptions
     .filter((item) => item.isActive && item.showInFilter)
     .sort((left, right) => left.sortOrder - right.sortOrder);
 }

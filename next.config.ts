@@ -1,48 +1,30 @@
 import type { NextConfig } from "next";
 
-function getImageHostname(value: string | undefined) {
-  const trimmedValue = value?.trim() ?? "";
+const cloudinaryCloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
 
-  if (!trimmedValue) {
-    return "";
-  }
-
-  if (/^https?:\/\//i.test(trimmedValue)) {
-    try {
-      return new URL(trimmedValue).hostname;
-    } catch {
-      return "";
+const cloudinaryRemotePattern = cloudinaryCloudName
+  ? {
+      protocol: "https" as const,
+      hostname: "res.cloudinary.com",
+      pathname: `/${cloudinaryCloudName}/image/upload/**`,
     }
-  }
-
-  return trimmedValue.replace(/^\/+/, "").split("/")[0].split(":")[0];
-}
-
-const imageCdnHostnames = (
-  [
-    "res.cloudinary.com",
-    process.env.NEXT_PUBLIC_IMAGE_CDN_HOSTNAMES,
-    process.env.IMAGE_CDN_HOSTNAMES,
-    getImageHostname(process.env.NEXT_PUBLIC_IMAGE_BASE_URL),
-  ]
-    .filter(Boolean)
-    .join(",")
-)
-  .split(",")
-  .map((hostname) => getImageHostname(hostname))
-  .filter(Boolean)
-  .filter((hostname, index, hostnames) => hostnames.indexOf(hostname) === index);
+  : {
+      protocol: "https" as const,
+      hostname: "res.cloudinary.com",
+    };
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "12mb",
+    },
+  },
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [75, 95],
     deviceSizes: [360, 414, 640, 768, 1024, 1280, 1536, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 192, 256, 320],
-    remotePatterns: imageCdnHostnames.map((hostname) => ({
-      protocol: "https",
-      hostname,
-      pathname: "/**",
-    })),
+    remotePatterns: [cloudinaryRemotePattern],
   },
 };
 

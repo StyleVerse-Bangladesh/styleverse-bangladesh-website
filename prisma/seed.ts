@@ -282,6 +282,7 @@ async function main() {
   const categoryCount = await seedStorefrontCategories();
   const productStats = await seedStorefrontProducts();
   const homepageStats = await seedHomepageCmsContent();
+  const homepageCategorySlotStats = await seedHomepageCategorySlots();
   const couponCount = await seedCoupons();
 
   console.log(
@@ -291,6 +292,9 @@ async function main() {
       `${productStats.variants} variants, ${productStats.productCategoryLinks} category links,`,
       `and ${productStats.preorders} preorder settings.`,
       `Seeded ${homepageStats.sections} homepage sections and ${homepageStats.items} homepage items.`,
+      homepageCategorySlotStats.skipped
+        ? "Skipped homepage Shop By Category slot seed because one or more categories are missing."
+        : `Seeded ${homepageCategorySlotStats.slots} homepage category slots and ${homepageCategorySlotStats.items} slot items.`,
       `Seeded ${couponCount} coupons.`,
       `Seeded admin user ${adminSeedEmail}.`,
       "Seeded placeholder Pathao courier account.",
@@ -801,6 +805,94 @@ async function seedHomepageCmsContent() {
   };
 }
 
+async function seedHomepageCategorySlots() {
+  const categoriesByPathKey = await getHomepageCategoriesByPathKey();
+  const seeds = getHomepageCategorySlotSeeds();
+  const missingPathKeys = seeds.flatMap((slot) => {
+    const requiredPathKeys = [slot.rootPathKey, ...slot.itemPathKeys];
+
+    return requiredPathKeys.filter((pathKey) => !categoriesByPathKey.has(pathKey));
+  });
+
+  if (missingPathKeys.length) {
+    console.warn(
+      `Skipping homepage Shop By Category slot seed. Missing categories: ${[
+        ...new Set(missingPathKeys),
+      ].join(", ")}`,
+    );
+
+    return {
+      items: 0,
+      skipped: true,
+      slots: 0,
+    };
+  }
+
+  let itemCount = 0;
+
+  for (const seed of seeds) {
+    const rootCategory = categoriesByPathKey.get(seed.rootPathKey);
+
+    if (!rootCategory) {
+      continue;
+    }
+
+    const slot = await prisma.homepageCategorySlot.upsert({
+      where: { position: seed.position },
+      update: {
+        isActive: true,
+        rootCategoryId: rootCategory.id,
+        title: seed.title,
+      },
+      create: {
+        isActive: true,
+        position: seed.position,
+        rootCategoryId: rootCategory.id,
+        title: seed.title,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    for (const [index, pathKey] of seed.itemPathKeys.entries()) {
+      const category = categoriesByPathKey.get(pathKey);
+
+      if (!category) {
+        continue;
+      }
+
+      await prisma.homepageCategorySlotItem.upsert({
+        where: {
+          slotId_position: {
+            position: index + 1,
+            slotId: slot.id,
+          },
+        },
+        update: {
+          categoryId: category.id,
+          imageOverride: null,
+          labelOverride: null,
+        },
+        create: {
+          categoryId: category.id,
+          imageOverride: null,
+          labelOverride: null,
+          position: index + 1,
+          slotId: slot.id,
+        },
+      });
+      itemCount += 1;
+    }
+  }
+
+  return {
+    items: itemCount,
+    skipped: false,
+    slots: seeds.length,
+  };
+}
+
 async function seedCoupons() {
   for (const coupon of staticCoupons) {
     const minimumOrder =
@@ -878,6 +970,52 @@ type HomepageItemSeed = {
   subtitle?: string;
   title?: string;
 };
+
+type HomepageCategorySlotSeed = {
+  itemPathKeys: string[];
+  position: number;
+  rootPathKey: string;
+  title: string;
+};
+
+function getHomepageCategorySlotSeeds(): HomepageCategorySlotSeed[] {
+  return [
+    {
+      itemPathKeys: ["men/t-shirts", "men/polo-t-shirts", "men/shirts", "men/joggers"],
+      position: 1,
+      rootPathKey: "men",
+      title: "Men Essentials",
+    },
+    {
+      itemPathKeys: [
+        "women/dresses",
+        "women/tops",
+        "women/co-ord-set",
+        "women/outerwear",
+      ],
+      position: 2,
+      rootPathKey: "women",
+      title: "Women Collection",
+    },
+    {
+      itemPathKeys: ["kids/t-shirts", "kids/sets", "kids/shoes", "kids/accessories"],
+      position: 3,
+      rootPathKey: "kids",
+      title: "Kids",
+    },
+    {
+      itemPathKeys: [
+        "accessories/bags",
+        "accessories/caps",
+        "accessories/belts",
+        "accessories/sunglasses",
+      ],
+      position: 4,
+      rootPathKey: "accessories",
+      title: "Accessories",
+    },
+  ];
+}
 
 function getHomepageSectionSeeds(): HomepageSectionSeed[] {
   return [

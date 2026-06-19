@@ -5,6 +5,7 @@ import {
   useRef,
   type MouseEvent as ReactMouseEvent,
   type MouseEventHandler,
+  type ReactNode,
 } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -12,27 +13,45 @@ import {
   BookmarkCheck,
   Heart,
   Menu,
-  Search,
-  ShoppingCart,
   UserRound,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { mainNavigation } from "@/lib/constants/navigation";
+import { CompactDesktopSearch } from "@/components/search/desktop-product-search";
+import { HomeDesktopSearch } from "@/components/search/home-desktop-search";
+import { getNavigationItems } from "@/lib/constants/navigation";
 import { siteContainerClassName } from "@/lib/constants/layout";
-import { useCartSummary } from "@/hooks/use-cart-summary";
+import type { SearchProduct } from "@/lib/product-search";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/ui-store";
 import { useWishlistStore } from "@/store/wishlist-store";
 import type { StorefrontSettingsDto } from "@/types/api/settings.dto";
+import type { NavItem } from "@/types/navigation";
 import { MegaMenuShell } from "./mega-menu-shell";
 
 const megaMenuCloseDelay = 250;
 
-export function Header({ settings }: { settings: StorefrontSettingsDto }) {
+const categoryHeaderNavigationItems: NavItem[] = [
+  { label: "MEN", href: "/men", menuKey: "men" },
+  { label: "WOMEN", href: "/women", menuKey: "women" },
+  { label: "KIDS", href: "/kids", menuKey: "kids" },
+  { label: "SEASONAL FITS", href: "/seasonal-fits", menuKey: "seasonal-fits" },
+  { label: "SPORTS", href: "/sports", menuKey: "sports" },
+  { label: "SHOES", href: "/shoes", menuKey: "shoes" },
+  { label: "ACCESSORIES", href: "/accessories", menuKey: "accessories" },
+];
+
+export function Header({
+  navigation,
+  searchProducts,
+  settings,
+}: {
+  navigation?: NavItem[];
+  searchProducts: SearchProduct[];
+  settings: StorefrontSettingsDto;
+}) {
   const pathname = usePathname();
-  const { itemCount } = useCartSummary();
+  const navigationItems = getNavigationItems(navigation);
   const wishlistCount = useWishlistStore((state) => state.productIds.length);
   const activeMegaMenu = useUiStore((state) => state.activeMegaMenu);
   const setActiveMegaMenu = useUiStore((state) => state.setActiveMegaMenu);
@@ -45,7 +64,26 @@ export function Header({ settings }: { settings: StorefrontSettingsDto }) {
   const setMobileWishlistDrawerOpen = useUiStore(
     (state) => state.setMobileWishlistDrawerOpen,
   );
-  const isHomePage = pathname === "/";
+  const setAuthModalOpen = useUiStore((state) => state.setMobileAuthModalOpen);
+  const firstPathSegment = pathname.split("/").filter(Boolean)[0] ?? null;
+  const activeCategorySegment =
+    categoryHeaderNavigationItems.find(
+      (item) => item.menuKey === firstPathSegment,
+    )?.menuKey ?? null;
+  const useCategoryHeader =
+    pathname === "/products" || Boolean(activeCategorySegment);
+  const headerVariant =
+    pathname === "/" ? "home" : useCategoryHeader ? "category" : "default";
+  const showCompactDesktopSearch = !pathname.startsWith("/admin");
+  const fixedCategoryNavigationItems = categoryHeaderNavigationItems.map((item) => {
+    const navigationItem = navigationItems.find(
+      (candidate) => candidate.menuKey === item.menuKey,
+    );
+
+    return navigationItem?.children?.length
+      ? { ...item, children: navigationItem.children }
+      : item;
+  });
   const closeTimerRef = useRef<number | null>(null);
 
   function clearMegaMenuCloseTimer() {
@@ -83,7 +121,7 @@ export function Header({ settings }: { settings: StorefrontSettingsDto }) {
     return () => clearMegaMenuCloseTimer();
   }, []);
 
-  if (isHomePage) {
+  if (headerVariant === "home") {
     return (
       <header
         className="sticky top-0 z-40 border-b border-black/5 bg-white/75 shadow-sm backdrop-blur-xl md:border-b md:bg-background md:shadow-none md:backdrop-blur-none"
@@ -120,14 +158,7 @@ export function Header({ settings }: { settings: StorefrontSettingsDto }) {
               src={settings.logo.header}
             />
 
-            <div className="relative hidden w-full md:col-span-1 md:block">
-              <Input
-                className="h-10 rounded-full border-black bg-white px-4 pr-11 text-sm placeholder:text-zinc-600 focus-visible:ring-black"
-                placeholder="Search Products By Name....."
-                aria-label="Search products by name"
-              />
-              <Search className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black" />
-            </div>
+            <HomeDesktopSearch products={searchProducts} />
 
             <div className="flex items-center justify-end md:gap-1">
               <Button
@@ -144,45 +175,12 @@ export function Header({ settings }: { settings: StorefrontSettingsDto }) {
                   <WishlistCountBadge count={wishlistCount} />
                 </span>
               </Button>
-              <Button
-                className="hidden md:inline-flex"
-                variant="ghost"
-                size="icon"
-                aria-label="Profile"
-                asChild
-              >
-                <Link href="/login">
-                  <UserRound className="h-5 w-5 text-black" />
-                </Link>
-              </Button>
-              <Button
-                className="hidden md:inline-flex"
-                variant="ghost"
-                size="icon"
-                aria-label="Cart"
-                asChild
-              >
-                <Link href="/cart" className="relative">
-                  <ShoppingCart className="h-5 w-5 text-black" />
-                  {itemCount > 0 ? (
-                    <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-black px-1 text-[10px] text-white">
-                      {itemCount}
-                    </span>
-                  ) : null}
-                </Link>
-              </Button>
-              <Button
-                className="hidden md:inline-flex"
-                variant="ghost"
-                size="icon"
-                aria-label="Wishlist"
-                asChild
-              >
-                <Link href="/wishlist" className="relative">
-                  <UserRound className="h-5 w-5 text-black" />
-                  <WishlistCountBadge count={wishlistCount} />
-                </Link>
-              </Button>
+              <DesktopHeaderActions
+                wishlistCount={wishlistCount}
+                wishlistOpen={isMobileWishlistDrawerOpen}
+                onWishlistOpen={() => setMobileWishlistDrawerOpen(true)}
+                onProfileOpen={() => setAuthModalOpen(true)}
+              />
             </div>
           </div>
         </div>
@@ -199,7 +197,7 @@ export function Header({ settings }: { settings: StorefrontSettingsDto }) {
               )}
             >
               <div className="flex h-10 items-center justify-center gap-4 px-6">
-              {mainNavigation.map((item) => (
+              {navigationItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -218,6 +216,115 @@ export function Header({ settings }: { settings: StorefrontSettingsDto }) {
 
           <MegaMenuShell
             activeMenuKey={activeMegaMenu}
+            navigation={navigationItems}
+            onMouseEnter={clearMegaMenuCloseTimer}
+            onMouseLeave={scheduleMegaMenuClose}
+          />
+        </div>
+      </header>
+    );
+  }
+
+  if (headerVariant === "category") {
+    return (
+      <header
+        className="sticky top-0 z-40 border-b border-black/5 bg-white/75 shadow-sm backdrop-blur-xl md:border-b md:bg-background md:shadow-none md:backdrop-blur-none"
+        onMouseLeave={closeMegaMenu}
+      >
+        <div
+          onMouseEnter={clearMegaMenuCloseTimer}
+          onMouseLeave={scheduleMegaMenuClose}
+        >
+          <div className="md:bg-[#f1f2f3] md:backdrop-blur-none">
+            <div
+              className={cn(
+                siteContainerClassName,
+                "grid h-16 grid-cols-[3rem_minmax(0,1fr)_3rem] items-center md:h-auto md:min-h-[72px] md:grid-cols-[1fr_minmax(320px,560px)_1fr] md:gap-3 md:py-3",
+              )}
+            >
+              <div className="flex items-center justify-start md:gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  onClick={() => setMobileCategoryDrawerOpen(true)}
+                  aria-label="Open menu"
+                  aria-controls="mobile-category-drawer"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <StyleVerseLogo
+                  alt={settings.storeName}
+                  className="hidden md:block"
+                  onMouseEnter={closeMegaMenu}
+                  src={settings.logo.header}
+                />
+              </div>
+
+              <StyleVerseLogo
+                alt={settings.storeName}
+                className="justify-self-center md:hidden"
+                src={settings.logo.header}
+              />
+
+              <nav
+                className="hidden min-w-0 justify-self-center md:flex"
+                aria-label="Primary categories"
+              >
+                <div className="flex h-10 min-w-0 items-center justify-center gap-2 px-1 lg:gap-3 lg:px-2 xl:gap-4 xl:px-3">
+                  {fixedCategoryNavigationItems.map((item) => {
+                    const active = activeCategorySegment === item.menuKey;
+                    const activeMegaMenuItem = activeMegaMenu === item.menuKey;
+
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "relative shrink-0 px-1 py-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-black transition-opacity after:pointer-events-none after:absolute after:inset-x-1 after:bottom-1 after:h-px after:origin-center after:scale-x-0 after:bg-current after:transition-transform after:duration-200 after:ease-out hover:opacity-60 hover:after:scale-x-100 lg:px-1.5 lg:text-xs lg:after:inset-x-1.5 xl:px-2 xl:text-sm xl:after:inset-x-2",
+                          (active || activeMegaMenuItem) && "after:scale-x-100",
+                        )}
+                        aria-current={active ? "page" : undefined}
+                        onMouseEnter={() => openMegaMenu(item.menuKey)}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </nav>
+
+              <div className="flex items-center justify-end md:gap-3" onMouseEnter={closeMegaMenu}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  onClick={() => setMobileWishlistDrawerOpen(true)}
+                  aria-label="Wishlist"
+                  aria-expanded={isMobileWishlistDrawerOpen}
+                  aria-controls="mobile-wishlist-drawer"
+                >
+                  <span className="relative">
+                    <BookmarkCheck className="h-5 w-5 text-black" />
+                    <WishlistCountBadge count={wishlistCount} />
+                  </span>
+                </Button>
+                {showCompactDesktopSearch ? (
+                  <CompactDesktopSearch products={searchProducts} />
+                ) : null}
+                <DesktopHeaderActions
+                  wishlistCount={wishlistCount}
+                  wishlistOpen={isMobileWishlistDrawerOpen}
+                  onWishlistOpen={() => setMobileWishlistDrawerOpen(true)}
+                  onProfileOpen={() => setAuthModalOpen(true)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <MegaMenuShell
+            activeMenuKey={activeMegaMenu}
+            navigation={fixedCategoryNavigationItems}
             onMouseEnter={clearMegaMenuCloseTimer}
             onMouseLeave={scheduleMegaMenuClose}
           />
@@ -263,7 +370,7 @@ export function Header({ settings }: { settings: StorefrontSettingsDto }) {
 
           <nav className="hidden min-w-0 flex-1 items-center justify-center md:flex">
             <div className="flex h-10 min-w-0 items-center justify-center gap-1 bg-white/55 px-2 shadow-[0_8px_24px_rgba(0,0,0,0.08)] backdrop-blur-xl lg:gap-2 lg:px-3 xl:gap-4 xl:px-6">
-            {mainNavigation.map((item) => (
+            {navigationItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -279,15 +386,8 @@ export function Header({ settings }: { settings: StorefrontSettingsDto }) {
             </div>
           </nav>
 
-          <div className="hidden w-52 items-center xl:flex" onMouseEnter={closeMegaMenu}>
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Search" aria-label="Search" />
-            </div>
-          </div>
-
           <div
-            className="ml-auto flex items-center justify-self-end gap-0 sm:gap-1 md:ml-0 md:justify-self-auto"
+            className="ml-auto flex items-center justify-self-end gap-0 sm:gap-1 md:ml-0 md:justify-self-auto md:gap-3"
             onMouseEnter={closeMegaMenu}
           >
             <Button
@@ -304,55 +404,89 @@ export function Header({ settings }: { settings: StorefrontSettingsDto }) {
                 <WishlistCountBadge count={wishlistCount} />
               </span>
             </Button>
-            <Button
-              className="hidden md:inline-flex"
-              variant="ghost"
-              size="icon"
-              aria-label="Wishlist"
-              asChild
-            >
-              <Link href="/wishlist" className="relative">
-                <Heart className="h-5 w-5" />
-                <WishlistCountBadge count={wishlistCount} />
-              </Link>
-            </Button>
-            <Button
-              className="hidden md:inline-flex"
-              variant="ghost"
-              size="icon"
-              aria-label="Cart"
-              asChild
-            >
-              <Link href="/cart" className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                {itemCount > 0 ? (
-                  <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
-                    {itemCount}
-                  </span>
-                ) : null}
-              </Link>
-            </Button>
-            <Button
-              className="hidden md:inline-flex"
-              variant="ghost"
-              size="icon"
-              aria-label="Profile"
-              asChild
-            >
-              <Link href="/login">
-                <UserRound className="h-5 w-5" />
-              </Link>
-            </Button>
+            {showCompactDesktopSearch ? (
+              <CompactDesktopSearch products={searchProducts} />
+            ) : null}
+            <DesktopHeaderActions
+              wishlistCount={wishlistCount}
+              wishlistOpen={isMobileWishlistDrawerOpen}
+              onWishlistOpen={() => setMobileWishlistDrawerOpen(true)}
+              onProfileOpen={() => setAuthModalOpen(true)}
+            />
           </div>
         </div>
 
         <MegaMenuShell
           activeMenuKey={activeMegaMenu}
+          navigation={navigationItems}
           onMouseEnter={clearMegaMenuCloseTimer}
           onMouseLeave={scheduleMegaMenuClose}
         />
       </div>
     </header>
+  );
+}
+
+function DesktopHeaderActions({
+  wishlistCount,
+  wishlistOpen,
+  onProfileOpen,
+  onWishlistOpen,
+}: {
+  wishlistCount: number;
+  wishlistOpen: boolean;
+  onProfileOpen: () => void;
+  onWishlistOpen: () => void;
+}) {
+  return (
+    <div className="hidden items-center gap-2 md:flex">
+      <HeaderIconAction
+        label="Wishlist"
+        onClick={onWishlistOpen}
+        ariaExpanded={wishlistOpen}
+        ariaControls="mobile-wishlist-drawer"
+      >
+        <span className="relative">
+          <Heart className="h-5 w-5" aria-hidden="true" />
+          <WishlistCountBadge count={wishlistCount} />
+        </span>
+      </HeaderIconAction>
+      <HeaderIconAction
+        label="Profile"
+        onClick={onProfileOpen}
+        ariaControls="mobile-auth-modal"
+      >
+        <UserRound className="h-5 w-5" aria-hidden="true" />
+      </HeaderIconAction>
+    </div>
+  );
+}
+
+function HeaderIconAction({
+  ariaControls,
+  ariaExpanded,
+  children,
+  label,
+  onClick,
+}: {
+  ariaControls: string;
+  ariaExpanded?: boolean;
+  children: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="inline-flex min-h-12 min-w-14 flex-col items-center justify-center gap-1 rounded-md px-2 text-[11px] font-semibold text-black transition-colors hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+      aria-label={label}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
+      onClick={onClick}
+    >
+      {children}
+      <span>{label}</span>
+    </button>
   );
 }
 

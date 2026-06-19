@@ -4,6 +4,7 @@ import {
   type ProductAdminFilters,
   type ProductAdminItem,
   type ProductAdminStatus,
+  type ProductAdminStatusFilter,
 } from "@/app/admin/(panel)/products/product-admin";
 import { db } from "@/lib/db";
 
@@ -14,10 +15,13 @@ export const metadata = {
 type AdminProductsPageProps = {
   searchParams?: Promise<{
     category?: string;
+    page?: string;
     search?: string;
     status?: string;
   }>;
 };
+
+const productsPerPage = 10;
 
 export default async function AdminProductsPage({
   searchParams,
@@ -25,15 +29,28 @@ export default async function AdminProductsPage({
   const params = await searchParams;
   const categoryOptions = await getCategoryOptions();
   const filters = getFilters(params, categoryOptions.map((item) => item.id));
-  const [products, summary] = await Promise.all([
-    getProducts(filters),
+  const where = buildProductWhere(filters);
+  const [filteredProductCount, summary] = await Promise.all([
+    db.product.count({ where }),
     getProductSummary(),
   ]);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredProductCount / productsPerPage),
+  );
+  const currentPage = clampPage(params?.page, totalPages);
+  const products = await getProducts(where, currentPage);
 
   return (
     <ProductAdminPage
       categories={categoryOptions}
       filters={filters}
+      pagination={{
+        currentPage,
+        pageSize: productsPerPage,
+        totalItems: filteredProductCount,
+        totalPages,
+      }}
       products={products}
       summary={summary}
     />
@@ -67,16 +84,10 @@ async function getCategoryOptions() {
     .sort((left, right) => left.pathKey.localeCompare(right.pathKey));
 }
 
-async function getProducts(filters: ProductAdminFilters) {
-  const where = buildProductWhere(filters);
+async function getProducts(where: Prisma.ProductWhereInput, page: number) {
   const products = await db.product.findMany({
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
     select: {
-      _count: {
-        select: {
-          orderItems: true,
-        },
-      },
       compareAtPrice: true,
       createdAt: true,
       currency: true,
@@ -97,6 +108,18 @@ async function getProducts(filters: ProductAdminFilters) {
           pathKey: true,
         },
       },
+      productCategories: {
+        orderBy: [{ category: { pathKey: "asc" } }],
+        select: {
+          category: {
+            select: {
+              label: true,
+              pathKey: true,
+            },
+          },
+          isPrimary: true,
+        },
+      },
       slug: true,
       status: true,
       updatedAt: true,
@@ -104,45 +127,63 @@ async function getProducts(filters: ProductAdminFilters) {
         where: {
           isActive: true,
         },
+        orderBy: [{ size: "asc" }, { colorName: "asc" }],
         select: {
+          colorName: true,
           preorderSetting: {
             select: {
               enabled: true,
             },
           },
+          size: true,
           stock: true,
         },
       },
     },
+    skip: (page - 1) * productsPerPage,
+    take: productsPerPage,
     where,
   });
 
   return products.map<ProductAdminItem>((product) => {
     const primaryImage =
       product.images.find((image) => image.isPrimary) ?? product.images[0];
+    const categories = getDisplayCategories(product);
+    const stockUnits = product.variants.reduce(
+      (total, variant) => total + Math.max(variant.stock, 0),
+      0,
+    );
+    const hasPreorder = product.variants.some(
+      (variant) => variant.preorderSetting?.enabled,
+    );
 
     return {
+      categories,
       compareAtPrice: product.compareAtPrice
         ? formatMoney(Number(product.compareAtPrice), product.currency)
         : null,
       createdAt: formatDate(product.createdAt),
-      hasPreorder: product.variants.some(
-        (variant) => variant.preorderSetting?.enabled,
-      ),
+      hasPreorder,
       id: product.id,
       imageAlt: primaryImage?.alt ?? product.name,
       imageUrl: primaryImage?.url ?? null,
+      inventoryBreakdown: product.variants.map((variant) => ({
+        label: formatVariantLabel(variant.size, variant.colorName),
+        stock: variant.stock,
+      })),
+      inventoryState:
+        stockUnits > 0
+          ? "IN_STOCK"
+          : hasPreorder
+            ? "PREORDER"
+            : "OUT_OF_STOCK",
       name: product.name,
-      orderItemCount: product._count.orderItems,
       price: formatMoney(Number(product.price), product.currency),
       primaryCategoryLabel: product.primaryCategory?.label ?? null,
       primaryCategoryPathKey: product.primaryCategory?.pathKey ?? null,
       slug: product.slug,
       status: product.status,
-      totalStock: product.variants.reduce(
-        (total, variant) => total + variant.stock,
-        0,
-      ),
+      totalStock: stockUnits,
       updatedAt: formatDate(product.updatedAt),
       variantCount: product.variants.length,
     };
@@ -150,25 +191,27 @@ async function getProducts(filters: ProductAdminFilters) {
 }
 
 async function getProductSummary() {
-  const [total, published, draft, archived] = await Promise.all([
-    db.product.count(),
+  const [total, published, archived] = await Promise.all([
+    db.product.count({
+      where: { status: { in: [ProductStatus.PUBLISHED, ProductStatus.ARCHIVED] } },
+    }),
     db.product.count({ where: { status: ProductStatus.PUBLISHED } }),
-    db.product.count({ where: { status: ProductStatus.DRAFT } }),
     db.product.count({ where: { status: ProductStatus.ARCHIVED } }),
   ]);
 
   return {
     archived,
-    draft,
     published,
     total,
   };
 }
 
-function buildProductWhere(filters: ProductAdminFilters): Prisma.ProductWhereInput {
-  return {
-    OR: filters.search
-      ? [
+function buildProductWhere(
+  filters: ProductAdminFilters,
+): Prisma.ProductWhereInput {
+  const searchWhere: Prisma.ProductWhereInput | undefined = filters.search
+    ? {
+        OR: [
           {
             name: {
               contains: filters.search,
@@ -181,10 +224,30 @@ function buildProductWhere(filters: ProductAdminFilters): Prisma.ProductWhereInp
               mode: "insensitive",
             },
           },
-        ]
-      : undefined,
-    primaryCategoryId: filters.category || undefined,
-    status: parseProductStatus(filters.status) ?? undefined,
+        ],
+      }
+    : undefined;
+  const categoryWhere: Prisma.ProductWhereInput | undefined = filters.category
+    ? {
+        OR: [
+          { primaryCategoryId: filters.category },
+          {
+            productCategories: {
+              some: {
+                categoryId: filters.category,
+              },
+            },
+          },
+        ],
+      }
+    : undefined;
+  const conditions = [searchWhere, categoryWhere].filter(
+    (condition): condition is Prisma.ProductWhereInput => Boolean(condition),
+  );
+
+  return {
+    AND: conditions.length ? conditions : undefined,
+    status: getStatusWhere(filters.status),
   };
 }
 
@@ -193,7 +256,7 @@ function getFilters(
   categoryIds: string[],
 ): ProductAdminFilters {
   const search = String(params?.search ?? "").trim();
-  const status = parseProductStatus(params?.status) ?? "";
+  const status = parseStatusFilter(params?.status);
   const submittedCategory = String(params?.category ?? "").trim();
   const category = categoryIds.includes(submittedCategory)
     ? submittedCategory
@@ -206,16 +269,75 @@ function getFilters(
   };
 }
 
-function parseProductStatus(value: unknown): ProductAdminStatus | null {
+function parseStatusFilter(value: unknown): ProductAdminStatusFilter {
   if (typeof value !== "string") {
-    return null;
+    return "ALL";
+  }
+
+  if (value === "ALL") {
+    return "ALL";
   }
 
   if (value in ProductStatus) {
+    return ProductStatus[
+      value as keyof typeof ProductStatus
+    ] as ProductAdminStatusFilter;
+  }
+
+  return "ALL";
+}
+
+function parseProductStatus(value: unknown): ProductAdminStatus | null {
+  if (typeof value === "string" && value in ProductStatus) {
     return ProductStatus[value as keyof typeof ProductStatus];
   }
 
   return null;
+}
+
+function getStatusWhere(
+  status: ProductAdminStatusFilter,
+): Prisma.ProductWhereInput["status"] {
+  if (status === "ALL") {
+    return { in: [ProductStatus.PUBLISHED, ProductStatus.ARCHIVED] };
+  }
+
+  return parseProductStatus(status) ?? undefined;
+}
+
+function clampPage(value: unknown, totalPages: number) {
+  const page =
+    typeof value === "string" ? Number.parseInt(value, 10) : Number.NaN;
+
+  if (!Number.isFinite(page) || page < 1) {
+    return 1;
+  }
+
+  return Math.min(page, totalPages);
+}
+
+function getDisplayCategories(product: {
+  primaryCategory: { label: string; pathKey: string } | null;
+  productCategories: {
+    category: { label: string; pathKey: string };
+    isPrimary: boolean;
+  }[];
+}) {
+  const categories = new Map<string, { label: string; pathKey: string }>();
+
+  if (product.primaryCategory) {
+    categories.set(product.primaryCategory.pathKey, product.primaryCategory);
+  }
+
+  for (const item of product.productCategories) {
+    categories.set(item.category.pathKey, item.category);
+  }
+
+  return Array.from(categories.values());
+}
+
+function formatVariantLabel(size: string, colorName: string) {
+  return size ? `${size} - ${colorName}` : colorName;
 }
 
 function formatMoney(value: number, currency: string) {

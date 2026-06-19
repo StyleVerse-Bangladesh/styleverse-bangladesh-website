@@ -406,7 +406,7 @@ function UploadButton() {
 }
 
 function ActionMessage({ state }: { state: MediaActionState }) {
-  const message = state.ok ? state.message : state.error;
+  const message = state.message;
 
   if (!message) {
     return null;

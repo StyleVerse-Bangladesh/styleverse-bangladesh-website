@@ -1,25 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
-import { Price } from "@/components/product/price";
+import { usePathname, useRouter } from "next/navigation";
+import { ProductSearchResults } from "@/components/search/product-search-results";
 import { Input } from "@/components/ui/input";
-import { products } from "@/data/catalog";
 import {
-  defaultImagePlaceholders,
-  getImageUrl,
-} from "@/lib/constants/assets";
+  getProductSearchResults,
+  type SearchProduct,
+} from "@/lib/product-search";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/ui-store";
-import type { Product } from "@/types/product";
 
-const maxResults = 6;
-
-export function MobileSearchDropdown() {
+export function MobileSearchDropdown({
+  products,
+}: {
+  products: SearchProduct[];
+}) {
   const pathname = usePathname();
+  const router = useRouter();
   const open = useUiStore((state) => state.isMobileSearchDropdownOpen);
   const setOpen = useUiStore((state) => state.setMobileSearchDropdownOpen);
   const [query, setQuery] = useState("");
@@ -28,14 +27,8 @@ export function MobileSearchDropdown() {
   const headerOffsetClassName = pathname === "/" ? "top-[72px]" : "top-16";
 
   const results = useMemo(() => {
-    if (!normalizedQuery) {
-      return [];
-    }
-
-    return products
-      .filter((product) => productMatchesQuery(product, normalizedQuery))
-      .slice(0, maxResults);
-  }, [normalizedQuery]);
+    return getProductSearchResults(products, normalizedQuery);
+  }, [normalizedQuery, products]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 768px)");
@@ -109,6 +102,15 @@ export function MobileSearchDropdown() {
               ref={inputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                const firstResult = results[0];
+
+                if (event.key === "Enter" && firstResult) {
+                  event.preventDefault();
+                  router.push(`/products/${firstResult.slug}`);
+                  setOpen(false);
+                }
+              }}
               className="h-11 rounded-full border-black/15 bg-white pl-10 pr-12 text-sm text-black shadow-sm placeholder:text-zinc-500 focus-visible:ring-black"
               placeholder="Search products"
               aria-label="Search products"
@@ -123,88 +125,14 @@ export function MobileSearchDropdown() {
             </button>
           </div>
 
-          <div
-            className={cn(
-              "mt-3 max-h-[60vh] overflow-y-auto rounded-lg border border-black/10 bg-white",
-              !normalizedQuery && "hidden",
-            )}
-          >
-            {results.length ? (
-              <div className="divide-y divide-zinc-100">
-                {results.map((product) => (
-                  <SearchResultRow
-                    key={product.id}
-                    product={product}
-                    onNavigate={() => setOpen(false)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="px-3 py-4 text-sm text-zinc-500">
-                No products found for &quot;{query.trim()}&quot;.
-              </p>
-            )}
-          </div>
+          <ProductSearchResults
+            className="mt-3"
+            onNavigate={() => setOpen(false)}
+            query={query}
+            results={results}
+          />
         </div>
       </div>
     </section>
   );
-}
-
-function SearchResultRow({
-  product,
-  onNavigate,
-}: {
-  product: Product;
-  onNavigate: () => void;
-}) {
-  const imageSrc = getImageUrl(
-    product.images[0],
-    defaultImagePlaceholders.product,
-  );
-
-  return (
-    <Link
-      href={`/products/${product.slug}`}
-      className="grid grid-cols-[56px_minmax(0,1fr)] gap-3 px-3 py-3 text-black transition-colors hover:bg-zinc-50 focus-visible:bg-zinc-50 focus-visible:outline-none"
-      onClick={onNavigate}
-    >
-      <span className="relative h-14 w-14 overflow-hidden rounded-md bg-zinc-100">
-        <Image
-          src={imageSrc}
-          alt={product.name}
-          fill
-          sizes="56px"
-          className="object-cover"
-        />
-      </span>
-
-      <span className="min-w-0 self-center">
-        <span className="block truncate text-sm font-semibold leading-5">
-          {product.name}
-        </span>
-        <Price
-          price={product.price}
-          compareAtPrice={product.compareAtPrice}
-          className="mt-0.5 text-xs text-black"
-        />
-      </span>
-    </Link>
-  );
-}
-
-function productMatchesQuery(product: Product, query: string) {
-  const searchText = [
-    product.name,
-    product.category,
-    product.subcategory,
-    product.gender,
-    product.department,
-    ...product.colors.map((color) => color.name),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  return searchText.includes(query);
 }

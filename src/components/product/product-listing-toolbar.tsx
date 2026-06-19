@@ -12,12 +12,14 @@ import {
 import type { ListingFilters, ProductListingFacets } from "@/types/listing";
 import { cn } from "@/lib/utils";
 import { ProductFilterDrawer } from "./product-filter-drawer";
+import type { ProductListingVariant } from "./product-listing";
 
 type ProductListingToolbarProps = {
   className?: string;
   filters?: ListingFilters;
   facets?: ProductListingFacets;
   basePath?: string;
+  variant?: ProductListingVariant;
 };
 
 export function ProductListingToolbar({
@@ -25,6 +27,7 @@ export function ProductListingToolbar({
   filters,
   facets,
   basePath,
+  variant = "default",
 }: ProductListingToolbarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -36,6 +39,7 @@ export function ProductListingToolbar({
   const currentSortLabel =
     productSortOptions.find((option) => option.value === currentSort)?.label ??
     "Default";
+  const hasDesktopSidebar = variant === "desktop-filter-sidebar";
 
   function applySort(sort: ListingFilters["sort"]) {
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -55,6 +59,8 @@ export function ProductListingToolbar({
       <div
         className={cn(
           "mb-4 grid min-w-0 grid-cols-2 gap-2 sm:mb-5 sm:max-w-sm",
+          hasDesktopSidebar &&
+            "md:flex md:max-w-none md:justify-end md:gap-0",
           className,
         )}
       >
@@ -62,7 +68,10 @@ export function ProductListingToolbar({
           type="button"
           variant="outline"
           size="sm"
-          className="h-11 w-full min-w-0 rounded-md border-zinc-200 bg-white px-3 text-xs font-semibold uppercase tracking-wide text-black shadow-sm hover:bg-zinc-50 sm:h-10 sm:text-sm"
+          className={cn(
+            "h-11 w-full min-w-0 rounded-md border-zinc-200 bg-white px-3 text-xs font-semibold uppercase tracking-wide text-black shadow-sm hover:bg-zinc-50 sm:h-10 sm:text-sm",
+            hasDesktopSidebar && "md:hidden",
+          )}
           disabled={!filters || !facets || !basePath}
           onClick={() => setFilterDrawerOpen(true)}
         >
@@ -74,23 +83,50 @@ export function ProductListingToolbar({
             </span>
           ) : null}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-11 w-full min-w-0 rounded-md border-zinc-200 bg-white px-3 text-xs font-semibold uppercase tracking-wide text-black shadow-sm sm:h-10 sm:text-sm"
-          disabled={!filters}
-          onClick={() => setSortOpen((open) => !open)}
-          aria-haspopup="listbox"
-          aria-expanded={sortOpen}
-        >
-          <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
-          <span className="truncate">{currentSortLabel}</span>
-        </Button>
+        <div className={cn(hasDesktopSidebar && "md:hidden")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-11 w-full min-w-0 rounded-md border-zinc-200 bg-white px-3 text-xs font-semibold uppercase tracking-wide text-black shadow-sm sm:h-10 sm:text-sm"
+            disabled={!filters}
+            onClick={() => setSortOpen((open) => !open)}
+            aria-haspopup="listbox"
+            aria-expanded={sortOpen}
+          >
+            <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+            <span className="truncate">{currentSortLabel}</span>
+          </Button>
+        </div>
+
+        {hasDesktopSidebar && filters ? (
+          <label className="hidden items-center gap-2 text-xs font-medium text-zinc-700 md:flex">
+            <span>Sort By</span>
+            <select
+              className="h-9 min-w-48 rounded-sm border border-zinc-300 bg-white px-3 text-xs text-zinc-800 shadow-sm outline-none transition-colors focus:border-black focus:ring-1 focus:ring-black"
+              value={currentSort}
+              onChange={(event) =>
+                applySort(event.target.value as ListingFilters["sort"])
+              }
+              aria-label="Sort products"
+            >
+              {productSortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {getDesktopSortLabel(option.value, option.label)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
 
       {filters && sortOpen ? (
-        <div className="relative z-20 mb-4 w-full max-w-sm rounded-md border border-zinc-200 bg-white p-1.5 shadow-xl shadow-black/10">
+        <div
+          className={cn(
+            "relative z-20 mb-4 w-full max-w-sm rounded-md border border-zinc-200 bg-white p-1.5 shadow-xl shadow-black/10",
+            hasDesktopSidebar && "md:hidden",
+          )}
+        >
           <div role="listbox" aria-label="Sort products" className="grid gap-1">
             {productSortOptions.map((option) => {
               const selected = option.value === currentSort;
@@ -130,4 +166,19 @@ export function ProductListingToolbar({
       ) : null}
     </>
   );
+}
+
+function getDesktopSortLabel(
+  value: ListingFilters["sort"],
+  fallbackLabel: string,
+) {
+  if (value === "price-asc") {
+    return "Price: Low to High";
+  }
+
+  if (value === "price-desc") {
+    return "Price: High to Low";
+  }
+
+  return fallbackLabel;
 }

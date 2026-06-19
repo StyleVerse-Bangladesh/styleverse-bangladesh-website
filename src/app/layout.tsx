@@ -2,7 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, Inter, JetBrains_Mono } from "next/font/google";
 import { AppProviders } from "@/providers/app-providers";
 import { SiteShell } from "@/components/layout/site-shell";
+import { getStorefrontProducts } from "@/data/catalog-access";
+import { getStorefrontNavigation } from "@/data/category-access";
 import { getStorefrontSettings } from "@/lib/api/clients/settings-client";
+import { toSearchProduct } from "@/lib/product-search";
 import "./globals.css";
 
 const sans = Inter({
@@ -23,6 +26,36 @@ const bebasNeue = Bebas_Neue({
   subsets: ["latin"],
   display: "swap",
 });
+
+const rawDomEventRejectionNormalizerScript = `
+(() => {
+  if (window.__styleverseRawEventRejectionNormalizer) {
+    return;
+  }
+
+  window.__styleverseRawEventRejectionNormalizer = true;
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason;
+
+    if (Object.prototype.toString.call(reason) !== "[object Event]") {
+      return;
+    }
+
+    const target = reason.target || reason.srcElement;
+    const source = target && (target.currentSrc || target.src || target.href);
+    const message = source
+      ? \`Resource load failed: \${source}\`
+      : \`Resource event rejected a promise: \${reason.type || "unknown"}\`;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    window.setTimeout(() => {
+      Promise.reject(new Error(message));
+    }, 0);
+  }, true);
+})();
+`;
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getStorefrontSettings();
@@ -65,7 +98,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const settings = await getStorefrontSettings();
+  const [settings, navigation, products] = await Promise.all([
+    getStorefrontSettings(),
+    getStorefrontNavigation(),
+    getStorefrontProducts(),
+  ]);
+  const searchProducts = products.map(toSearchProduct);
 
   return (
     <html
@@ -74,8 +112,19 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="font-sans antialiased">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: rawDomEventRejectionNormalizerScript,
+          }}
+        />
         <AppProviders>
-          <SiteShell settings={settings}>{children}</SiteShell>
+          <SiteShell
+            navigation={navigation}
+            searchProducts={searchProducts}
+            settings={settings}
+          >
+            {children}
+          </SiteShell>
         </AppProviders>
       </body>
     </html>

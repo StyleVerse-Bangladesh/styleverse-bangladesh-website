@@ -10,17 +10,15 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
-  filterQueryKeys,
   getActiveFilterCount,
   getEmptyListingFilters,
-  parseListingFilters,
-  serializeFilterValue,
+  getFilteredListingHref,
+  readListingFiltersFromSearchParams,
 } from "@/lib/catalog-filters";
 import { cn } from "@/lib/utils";
 import type {
   FilterOption,
   ListingFilters,
-  ListingSearchParams,
   ProductListingFacets,
 } from "@/types/listing";
 
@@ -38,11 +36,6 @@ type FilterSectionProps = {
   children: React.ReactNode;
 };
 
-type SearchParamsReader = {
-  get: (name: string) => string | null;
-  toString: () => string;
-};
-
 export function ProductFilterDrawer({
   open,
   onOpenChange,
@@ -57,12 +50,12 @@ export function ProductFilterDrawer({
 
   useEffect(() => {
     if (open) {
-      setDraftFilters(readFiltersFromUrl(searchParams));
+      setDraftFilters(readListingFiltersFromSearchParams(searchParams));
     }
   }, [open, searchParams]);
 
   function applyFilters() {
-    router.push(getFilteredHref(pathname, searchParams, draftFilters), {
+    router.push(getFilteredListingHref(pathname, searchParams, draftFilters), {
       scroll: false,
     });
     onOpenChange(false);
@@ -72,9 +65,12 @@ export function ProductFilterDrawer({
     const emptyFilters = getEmptyListingFilters();
 
     setDraftFilters(emptyFilters);
-    router.replace(getFilteredHref(pathname, searchParams, emptyFilters), {
-      scroll: false,
-    });
+    router.replace(
+      getFilteredListingHref(pathname, searchParams, emptyFilters),
+      {
+        scroll: false,
+      },
+    );
   }
 
   return (
@@ -281,50 +277,4 @@ function toggleValue(values: string[], value: string) {
   return values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value];
-}
-
-function readFiltersFromUrl(searchParams: SearchParamsReader): ListingFilters {
-  const params: ListingSearchParams = {};
-
-  for (const key of filterQueryKeys) {
-    params[key] = searchParams.get(key) ?? undefined;
-  }
-
-  return parseListingFilters(params);
-}
-
-function getFilteredHref(
-  pathname: string,
-  searchParams: SearchParamsReader,
-  filters: ListingFilters,
-) {
-  const nextParams = new URLSearchParams(searchParams.toString());
-
-  for (const key of filterQueryKeys) {
-    nextParams.delete(key);
-  }
-
-  const color = serializeFilterValue(filters.color);
-  const size = serializeFilterValue(filters.size);
-  const category = serializeFilterValue(filters.category);
-
-  if (color) {
-    nextParams.set("color", color);
-  }
-
-  if (size) {
-    nextParams.set("size", size);
-  }
-
-  if (category) {
-    nextParams.set("category", category);
-  }
-
-  if (filters.price) {
-    nextParams.set("price", filters.price);
-  }
-
-  const queryString = nextParams.toString();
-
-  return queryString ? `${pathname}?${queryString}` : pathname;
 }

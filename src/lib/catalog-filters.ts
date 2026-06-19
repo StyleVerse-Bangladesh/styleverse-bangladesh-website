@@ -8,6 +8,11 @@ import type {
 export const filterQueryKeys = ["color", "size", "category", "price"] as const;
 export const sortQueryKey = "sort";
 
+export type ListingSearchParamsReader = {
+  get: (name: string) => string | null;
+  toString: () => string;
+};
+
 export const productSortOptions: {
   label: string;
   value: ProductSort;
@@ -57,6 +62,56 @@ export function getActiveFilterCount(filters: ListingFilters) {
 
 export function serializeFilterValue(values: string[]) {
   return values.length ? values.join(",") : undefined;
+}
+
+export function readListingFiltersFromSearchParams(
+  searchParams: ListingSearchParamsReader,
+): ListingFilters {
+  const params: ListingSearchParams = {};
+
+  for (const key of filterQueryKeys) {
+    params[key] = searchParams.get(key) ?? undefined;
+  }
+
+  params[sortQueryKey] = searchParams.get(sortQueryKey) ?? undefined;
+
+  return parseListingFilters(params);
+}
+
+export function getFilteredListingHref(
+  pathname: string,
+  searchParams: ListingSearchParamsReader,
+  filters: ListingFilters,
+) {
+  const nextParams = new URLSearchParams(searchParams.toString());
+
+  for (const key of filterQueryKeys) {
+    nextParams.delete(key);
+  }
+
+  const color = serializeFilterValue(filters.color);
+  const size = serializeFilterValue(filters.size);
+  const category = serializeFilterValue(filters.category);
+
+  if (color) {
+    nextParams.set("color", color);
+  }
+
+  if (size) {
+    nextParams.set("size", size);
+  }
+
+  if (category) {
+    nextParams.set("category", category);
+  }
+
+  if (filters.price) {
+    nextParams.set("price", filters.price);
+  }
+
+  const queryString = nextParams.toString();
+
+  return queryString ? `${pathname}?${queryString}` : pathname;
 }
 
 function parseMultiValue(value: string | string[] | undefined) {

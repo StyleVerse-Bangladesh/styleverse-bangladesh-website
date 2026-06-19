@@ -408,7 +408,10 @@ export function NewArrivalsSection({
   }
 
   return (
-    <section className="bg-white pb-8 pt-0 sm:pb-12 sm:pt-2" aria-label="New arrivals">
+    <section
+      className="bg-white pb-8 pt-0 sm:pb-12 sm:pt-2 md:bg-transparent"
+      aria-label="New arrivals"
+    >
       <div className={siteContainerClassName}>
         <div className="relative border-b border-black/10 pb-2.5 text-center sm:pb-5">
           <HomeSectionHeading>{title}</HomeSectionHeading>

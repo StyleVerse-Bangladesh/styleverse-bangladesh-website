@@ -42,16 +42,16 @@ export function CategoryGroupCard({
     >
       <h3 className="text-lg font-extrabold text-black">{group.title}</h3>
       <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5">
-        {group.items.map((item) => (
+        {group.items.map((item, index) => (
           <Link
-            key={item.href}
+            key={`${item.href}-${item.label}-${index}`}
             href={item.href}
             className="group/item block rounded-md outline-none transition-transform duration-200 ease-out hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-black"
             draggable={itemDraggable}
             onClick={onItemClick}
           >
             <div
-              className={`relative aspect-square overflow-hidden rounded-md bg-gradient-to-br ${item.tone} shadow-sm shadow-black/10 transition-[box-shadow,transform] duration-300 ease-out group-hover/item:scale-[1.015] group-hover/item:shadow-lg group-hover/item:shadow-black/20 sm:aspect-[4/3]`}
+              className={`relative aspect-square overflow-hidden rounded-md bg-gradient-to-br ${item.tone} shadow-sm shadow-black/10 transition-[box-shadow,transform] duration-300 ease-out group-hover/item:scale-[1.015] group-hover/item:shadow-lg group-hover/item:shadow-black/20`}
             >
               {item.image ? (
                 <>

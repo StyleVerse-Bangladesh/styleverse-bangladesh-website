@@ -1,20 +1,36 @@
 import { create } from "zustand";
+import type { Product } from "@/types/product";
 
 type WishlistState = {
   productIds: string[];
-  toggleWishlist: (productId: string) => void;
+  productsById: Record<string, Product>;
+  toggleWishlist: (productId: string, product?: Product) => void;
   isWishlisted: (productId: string) => boolean;
   clearWishlist: () => void;
 };
 
 export const useWishlistStore = create<WishlistState>((set, get) => ({
   productIds: [],
-  toggleWishlist: (productId) =>
-    set((state) => ({
-      productIds: state.productIds.includes(productId)
-        ? state.productIds.filter((id) => id !== productId)
-        : [...state.productIds, productId],
-    })),
+  productsById: {},
+  toggleWishlist: (productId, product) =>
+    set((state) => {
+      if (state.productIds.includes(productId)) {
+        const productsById = { ...state.productsById };
+        delete productsById[productId];
+
+        return {
+          productIds: state.productIds.filter((id) => id !== productId),
+          productsById,
+        };
+      }
+
+      return {
+        productIds: [...state.productIds, productId],
+        productsById: product
+          ? { ...state.productsById, [productId]: product }
+          : state.productsById,
+      };
+    }),
   isWishlisted: (productId) => get().productIds.includes(productId),
-  clearWishlist: () => set({ productIds: [] }),
+  clearWishlist: () => set({ productIds: [], productsById: {} }),
 }));

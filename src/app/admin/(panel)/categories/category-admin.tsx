@@ -620,6 +620,7 @@ function CategoryEditorForm({
         </div>
       </FormRow>
 
+      {/* The featured field controls header and mobile category navigation. */}
       <FormRow label="Is Featured">
         <Toggle
           defaultChecked={state.values?.featured ?? category?.featured ?? false}
@@ -637,7 +638,8 @@ function CategoryEditorForm({
             name="featureInBanner"
           />
           <p className="text-xs text-zinc-500">
-            Shows this category in the homepage Shop By Category banner/box section.
+            Legacy homepage banner flag. Shop By Category is now managed from
+            Product Config &rarr; Shop By Categories.
           </p>
         </div>
       </FormRow>

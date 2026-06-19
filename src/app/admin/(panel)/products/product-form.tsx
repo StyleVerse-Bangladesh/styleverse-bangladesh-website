@@ -3,23 +3,28 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import Image from "next/image";
 import Link from "next/link";
-import { useActionState, useEffect, useState, type ReactNode } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { useFormStatus } from "react-dom";
 import {
   ArrowLeft,
-  Boxes,
   Check,
-  DollarSign,
-  Image as ImageIcon,
+  ImageIcon,
   ImageOff,
   ImagePlus,
   Images,
   Loader2,
-  PackagePlus,
+  Pencil,
   Plus,
   Save,
   Search,
-  Tags,
   Trash2,
   X,
 } from "lucide-react";
@@ -72,6 +77,8 @@ export type ProductFormValues = {
   name: string;
   price: string;
   primaryCategoryId: string;
+  seoDescription: string;
+  seoTitle: string;
   slug: string;
   status: ProductFormStatus;
   variants: ProductFormVariant[];
@@ -105,7 +112,6 @@ type ProductFormPageProps = {
 };
 
 const initialActionState: ProductFormActionState = {};
-const productStatuses: ProductFormStatus[] = ["DRAFT", "PUBLISHED", "ARCHIVED"];
 const productGenders: ProductFormGender[] = ["MEN", "WOMEN", "KIDS", "UNISEX"];
 const inventoryStatuses: ProductFormInventoryStatus[] = [
   "IN_STOCK",
@@ -113,6 +119,15 @@ const inventoryStatuses: ProductFormInventoryStatus[] = [
   "OUT_OF_STOCK",
   "PRE_ORDER",
 ];
+const productFormSections = [
+  { id: "general", label: "General" },
+  { id: "media", label: "Media Contents" },
+  { id: "description", label: "Description" },
+  { id: "seo", label: "SEO Content" },
+  { id: "inventory", label: "Inventory" },
+] as const;
+
+type ProductFormSectionId = (typeof productFormSections)[number]["id"];
 
 export function ProductFormPage({
   action,
@@ -121,42 +136,155 @@ export function ProductFormPage({
   product,
 }: ProductFormPageProps) {
   const [state, formAction] = useActionState(action, initialActionState);
+  const [activeSection, setActiveSection] =
+    useState<ProductFormSectionId>("general");
+  const [categorySearch, setCategorySearch] = useState("");
   const [images, setImages] = useState<ProductFormImage[]>(
     product.images.length ? product.images : [createBlankImage(true)],
+  );
+  const [productStatus, setProductStatus] = useState<
+    Extract<ProductFormStatus, "PUBLISHED" | "ARCHIVED">
+  >(product.status === "PUBLISHED" ? "PUBLISHED" : "ARCHIVED");
+  const [primaryCategoryId, setPrimaryCategoryId] = useState(
+    product.primaryCategoryId,
+  );
+  const [additionalCategoryIds, setAdditionalCategoryIds] = useState(
+    () => new Set(product.additionalCategoryIds),
   );
   const [variants, setVariants] = useState<ProductFormVariant[]>(
     product.variants.length ? product.variants : [createBlankVariant()],
   );
-  const title = mode === "create" ? "Create Product" : "Edit Product";
+  const title = mode === "create" ? "Add New Product" : "Edit Product";
+  const filteredCategories = useMemo(() => {
+    const search = categorySearch.trim().toLowerCase();
+
+    if (!search) {
+      return categories;
+    }
+
+    return categories.filter((category) =>
+      `${category.label} ${category.pathKey}`.toLowerCase().includes(search),
+    );
+  }, [categories, categorySearch]);
+  const additionalCategoryInputs = Array.from(additionalCategoryIds).filter(
+    (categoryId) => categoryId !== primaryCategoryId,
+  );
+
+  function activateSection(sectionId: ProductFormSectionId) {
+    setActiveSection(sectionId);
+    document
+      .getElementById("product-form-panel")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function toggleCategory(categoryId: string) {
+    if (categoryId === primaryCategoryId) {
+      setAdditionalCategoryIds((current) => {
+        const next = new Set(current);
+        next.delete(categoryId);
+        const [nextPrimaryCategoryId] = Array.from(next);
+        setPrimaryCategoryId(nextPrimaryCategoryId ?? "");
+
+        if (nextPrimaryCategoryId) {
+          next.delete(nextPrimaryCategoryId);
+        }
+
+        return next;
+      });
+      return;
+    }
+
+    if (!primaryCategoryId) {
+      setPrimaryCategoryId(categoryId);
+      return;
+    }
+
+    setAdditionalCategoryIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+
+      return next;
+    });
+  }
 
   return (
     <div className="grid gap-6">
-      <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <Link
-            className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-zinc-600 transition hover:text-zinc-950"
-            href="/admin/products"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Products
-          </Link>
-          <p className="mt-3 text-sm font-semibold text-sky-700">Products</p>
-          <h1 className="text-2xl font-black text-zinc-950 sm:text-3xl">
-            {title}
-          </h1>
-        </div>
+      <header className="min-w-0">
+        <Link
+          className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-zinc-600 transition hover:text-zinc-950"
+          href="/admin/products"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Products
+        </Link>
+        <h1 className="mt-3 text-2xl font-black text-zinc-950 sm:text-3xl">
+          {title}
+        </h1>
       </header>
 
-      <form action={formAction} className="grid gap-6" noValidate>
+      <form
+        action={formAction}
+        className="grid gap-4 xl:grid-cols-[12.5rem_minmax(0,1fr)_24rem] xl:items-start 2xl:grid-cols-[13rem_minmax(0,1fr)_25rem]"
+        noValidate
+      >
         {product.id ? <input name="id" type="hidden" value={product.id} /> : null}
+        <input
+          name="status"
+          type="hidden"
+          value={productStatus}
+        />
+        <input name="primaryCategoryId" type="hidden" value={primaryCategoryId} />
+        {additionalCategoryInputs.map((categoryId) => (
+          <input
+            key={categoryId}
+            name="additionalCategoryIds"
+            type="hidden"
+            value={categoryId}
+          />
+        ))}
 
-        <FormSection
-          description="Core catalog fields used by admin workflows."
-          icon={PackagePlus}
-          title="Product Information"
+        <nav
+          aria-label="Product form sections"
+          className="sticky top-4 z-10 -mx-4 overflow-x-auto px-4 xl:top-6 xl:mx-0 xl:overflow-visible xl:px-0"
         >
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField label="Product Name">
+          <div className="flex min-w-max gap-2 xl:grid xl:min-w-0">
+            {productFormSections.map((section) => (
+              <button
+                className={cn(
+                  "inline-flex min-h-10 items-center rounded-md bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm shadow-black/5 ring-1 ring-zinc-200 transition hover:text-zinc-950 xl:w-full xl:justify-start",
+                  activeSection === section.id &&
+                    "text-sky-700 ring-sky-100 shadow-md shadow-black/5",
+                )}
+                key={section.id}
+                onClick={() => activateSection(section.id)}
+                type="button"
+              >
+                {section.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        <div
+          className={cn(
+            "grid gap-4",
+            !["general", "media", "description"].includes(activeSection) &&
+              "xl:col-span-2",
+          )}
+          id="product-form-panel"
+        >
+          <ProductFormCard
+            className={cn(activeSection !== "general" && "hidden")}
+            id="general"
+            title="General"
+          >
+            <div className="grid gap-4 lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-center">
+              <FieldLabel>Name</FieldLabel>
               <input
                 className={inputClassName}
                 defaultValue={product.name}
@@ -164,39 +292,27 @@ export function ProductFormPage({
                 required
                 type="text"
               />
-            </FormField>
-            <FormField label="Slug">
-              <input
-                className={inputClassName}
-                defaultValue={product.slug}
-                name="slug"
-                required
-                type="text"
-              />
-            </FormField>
-          </div>
-          <FormField label="Description">
-            <textarea
-              className={cn(inputClassName, "min-h-28 py-3")}
-              defaultValue={product.description}
-              name="description"
-            />
-          </FormField>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField label="Status">
-              <select
-                className={inputClassName}
-                defaultValue={product.status}
-                name="status"
-              >
-                {productStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {formatEnumLabel(status)}
-                  </option>
-                ))}
+
+              <FieldLabel>Slug</FieldLabel>
+              <div className="grid gap-1.5">
+                <input
+                  className={inputClassName}
+                  defaultValue={product.slug}
+                  name="slug"
+                  required
+                  type="text"
+                />
+                <p className="text-xs italic text-zinc-500">
+                  Use product name in slug.
+                </p>
+              </div>
+
+              <FieldLabel>Type</FieldLabel>
+              <select className={inputClassName} disabled defaultValue="simple">
+                <option value="simple">Simple Product</option>
               </select>
-            </FormField>
-            <FormField label="Gender">
+
+              <FieldLabel>Audience</FieldLabel>
               <select
                 className={inputClassName}
                 defaultValue={product.gender}
@@ -208,279 +324,696 @@ export function ProductFormPage({
                   </option>
                 ))}
               </select>
-            </FormField>
-          </div>
-        </FormSection>
 
-        <FormSection
-          description="BDT values are stored with two decimal places."
-          icon={DollarSign}
-          title="Pricing"
-        >
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField label="Price">
-              <input
-                className={inputClassName}
-                defaultValue={product.price}
-                min="0"
-                name="price"
-                required
-                step="0.01"
-                type="number"
-              />
-            </FormField>
-            <FormField label="Compare Price">
-              <input
-                className={inputClassName}
+              <FieldLabel>Attributes</FieldLabel>
+              <div className="flex min-h-11 items-center rounded-md border border-zinc-200 bg-zinc-100 px-3 text-sm font-semibold text-zinc-400">
+                Attribute configuration is coming soon.
+              </div>
+
+              <FieldLabel>Regular Price</FieldLabel>
+              <CurrencyInput
                 defaultValue={product.compareAtPrice}
-                min="0"
                 name="compareAtPrice"
-                step="0.01"
-                type="number"
               />
-            </FormField>
-          </div>
-        </FormSection>
 
-        <FormSection
-          description="Primary category powers admin filtering and product ownership."
-          icon={Tags}
-          title="Category Assignment"
-        >
-          <FormField label="Primary Category">
-            <select
-              className={inputClassName}
-              defaultValue={product.primaryCategoryId}
-              name="primaryCategoryId"
-              required
-            >
-              <option value="">Choose category</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {`${"- ".repeat(category.depth)}${category.label} (${category.pathKey})`}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <div className="grid gap-2">
-            <p className="text-xs font-semibold uppercase text-zinc-500">
-              Additional Categories
-            </p>
-            <div className="grid max-h-72 gap-2 overflow-y-auto rounded-md border border-zinc-200 bg-zinc-50 p-3 md:grid-cols-2">
-              {categories.map((category) => (
-                <label
-                  className="flex min-h-10 items-start gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-sm shadow-black/5"
-                  key={category.id}
-                >
-                  <input
-                    className="mt-1 h-4 w-4 accent-zinc-950"
-                    defaultChecked={product.additionalCategoryIds.includes(
-                      category.id,
-                    )}
-                    name="additionalCategoryIds"
-                    type="checkbox"
-                    value={category.id}
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-zinc-950">{category.label}</span>
-                    <span className="block break-words font-mono text-xs text-zinc-500">
-                      {category.pathKey}
-                    </span>
-                  </span>
-                </label>
+              <FieldLabel>Sale Price</FieldLabel>
+              <CurrencyInput defaultValue={product.price} name="price" required />
+            </div>
+          </ProductFormCard>
+
+          <ProductFormCard
+            className={cn(activeSection !== "media" && "hidden")}
+            id="media"
+            title="Media Contents"
+          >
+            <MediaContentsPanel images={images} onImagesChange={setImages} />
+          </ProductFormCard>
+
+          <ProductFormCard
+            className={cn(activeSection !== "description" && "hidden")}
+            id="description"
+            title="Product Description"
+          >
+            <ProductDescriptionPanel description={product.description} />
+          </ProductFormCard>
+
+          <ProductFormCard
+            className={cn(activeSection !== "seo" && "hidden")}
+            id="seo"
+            title="SEO Contents"
+          >
+            <SeoContentPanel
+              seoDescription={product.seoDescription}
+              seoTitle={product.seoTitle}
+            />
+          </ProductFormCard>
+
+          <ProductFormCard
+            className={cn(activeSection !== "inventory" && "hidden")}
+            id="inventory"
+            title="Inventory"
+          >
+            <div className="grid gap-3">
+              {variants.map((variant) => (
+                <VariantRow
+                  key={variant.key}
+                  onChange={(nextVariant) =>
+                    setVariants((current) =>
+                      current.map((item) =>
+                        item.key === variant.key ? nextVariant : item,
+                      ),
+                    )
+                  }
+                  onRemove={() =>
+                    setVariants((current) =>
+                      current.filter((item) => item.key !== variant.key),
+                    )
+                  }
+                  variant={variant}
+                />
               ))}
             </div>
-          </div>
-        </FormSection>
+            <button
+              className={secondaryButtonClassName}
+              onClick={() =>
+                setVariants((current) => [...current, createBlankVariant()])
+              }
+              type="button"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add variant
+            </button>
+          </ProductFormCard>
 
-        <FormSection
-          description="Choose images from the Media Library or paste a direct URL when needed."
-          icon={ImageIcon}
-          title="Images"
+          <ActionMessage state={state} />
+
+          <div className="sticky bottom-0 z-10 -mx-4 border-t border-zinc-200 bg-[#f4f6f8]/95 p-4 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+            <SubmitButton label={mode === "create" ? "Submit" : "Save product"} />
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            "grid gap-4 xl:sticky xl:top-6",
+            !["general", "media", "description"].includes(activeSection) &&
+              "hidden",
+          )}
         >
-          <div className="grid gap-3">
-            {images.map((image, index) => (
-              <ImageRow
-                image={image}
-                index={index}
-                key={image.key}
-                onChange={(nextImage) =>
-                  setImages((current) =>
-                    current.map((item) =>
-                      item.key === image.key ? nextImage : item,
-                    ),
-                  )
-                }
-                onMakePrimary={() =>
-                  setImages((current) =>
-                    current.map((item) => ({
-                      ...item,
-                      isPrimary: item.key === image.key,
-                    })),
-                  )
-                }
-                onRemove={() =>
-                  setImages((current) => removeImageRow(current, image.key))
+          <aside className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm shadow-black/5">
+            <h2 className="border-b border-zinc-200 px-4 py-3 text-base font-black text-zinc-950">
+              Product Status
+            </h2>
+            <div className="grid gap-5 p-4">
+              <ToggleRow
+                checked={productStatus === "PUBLISHED"}
+                label="Publish Product"
+                onChange={(checked) =>
+                  setProductStatus(checked ? "PUBLISHED" : "ARCHIVED")
                 }
               />
-            ))}
-          </div>
-          <button
-            className={secondaryButtonClassName}
-            onClick={() =>
-              setImages((current) => [
-                ...current,
-                createBlankImage(current.length === 0),
-              ])
-            }
-            type="button"
-          >
-            <ImagePlus className="h-4 w-4" aria-hidden="true" />
-            Add image
-          </button>
-        </FormSection>
-
-        <FormSection
-          description="Create or update sellable options and stock state."
-          icon={Boxes}
-          title="Variants"
-        >
-          <div className="grid gap-3">
-            {variants.map((variant) => (
-              <VariantRow
-                key={variant.key}
-                onChange={(nextVariant) =>
-                  setVariants((current) =>
-                    current.map((item) =>
-                      item.key === variant.key ? nextVariant : item,
-                    ),
-                  )
-                }
-                onRemove={() =>
-                  setVariants((current) =>
-                    current.filter((item) => item.key !== variant.key),
-                  )
-                }
-                variant={variant}
+              {productStatus === "ARCHIVED" ? (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  This product is archived. Turn on Publish Product to publish
+                  it, or save without changing status to keep it archived.
+                </p>
+              ) : null}
+              <ToggleRow
+                checked={false}
+                disabled
+                helperText="Coming soon"
+                label="Show in Products Page"
               />
-            ))}
-          </div>
-          <button
-            className={secondaryButtonClassName}
-            onClick={() =>
-              setVariants((current) => [...current, createBlankVariant()])
-            }
-            type="button"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add variant
-          </button>
-        </FormSection>
+            </div>
+          </aside>
 
-        <ActionMessage state={state} />
+          <aside className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm shadow-black/5">
+            <h2 className="border-b border-zinc-200 px-4 py-3 text-base font-black text-zinc-950">
+              Categories
+            </h2>
+            <div className="grid gap-4 p-4">
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+                  aria-hidden="true"
+                />
+                <input
+                  className={cn(inputClassName, "pl-9")}
+                  onChange={(event) => setCategorySearch(event.target.value)}
+                  placeholder="Search Category"
+                  type="search"
+                  value={categorySearch}
+                />
+              </div>
+              <div className="max-h-80 overflow-y-auto rounded-md border border-zinc-200 bg-white p-3">
+                {filteredCategories.length ? (
+                  <div className="grid gap-2">
+                    {filteredCategories.map((category) => {
+                      const checked =
+                        category.id === primaryCategoryId ||
+                        additionalCategoryIds.has(category.id);
+                      const isPrimary = category.id === primaryCategoryId;
 
-        <div className="sticky bottom-0 z-10 -mx-4 border-t border-zinc-200 bg-[#f4f6f8]/95 p-4 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-          <SubmitButton label={mode === "create" ? "Create product" : "Save product"} />
+                      return (
+                        <label
+                          className="flex min-h-8 items-start gap-2 text-sm font-semibold text-zinc-700"
+                          key={category.id}
+                          style={{
+                            paddingLeft: `${Math.min(category.depth, 4) * 16}px`,
+                          }}
+                        >
+                          <input
+                            checked={checked}
+                            className="mt-1 h-4 w-4 rounded border-zinc-300 accent-zinc-950"
+                            onChange={() => toggleCategory(category.id)}
+                            type="checkbox"
+                          />
+                          <span className="min-w-0">
+                            <span className="break-words text-zinc-800">
+                              {category.label}
+                              {isPrimary ? (
+                                <span className="ml-2 rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-black uppercase text-sky-700">
+                                  Primary
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className="block break-words font-mono text-xs font-medium text-zinc-400">
+                              {category.pathKey}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="py-6 text-center text-sm font-semibold text-zinc-500">
+                    No categories match your search.
+                  </p>
+                )}
+              </div>
+              {!primaryCategoryId ? (
+                <p className="text-xs font-semibold text-red-600">
+                  Select at least one category. The first selected category is
+                  submitted as primary.
+                </p>
+              ) : null}
+            </div>
+          </aside>
         </div>
       </form>
     </div>
   );
 }
 
-function ImageRow({
-  image,
-  index,
-  onChange,
-  onMakePrimary,
-  onRemove,
+function ProductFormCard({
+  children,
+  className,
+  id,
+  title,
 }: {
-  image: ProductFormImage;
-  index: number;
-  onChange: (image: ProductFormImage) => void;
-  onMakePrimary: () => void;
-  onRemove: () => void;
+  children: ReactNode;
+  className?: string;
+  id: ProductFormSectionId;
+  title: string;
 }) {
   return (
-    <div className="grid gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_auto] md:items-end">
-      <FormControl label="Image URL">
-        <div className="grid gap-2">
-          <div className="grid gap-3 sm:grid-cols-[5rem_minmax(0,1fr)]">
-            <ImagePreview image={image} />
-            <input
-              className={inputClassName}
-              name="imageUrl"
-              onChange={(event) => onChange({ ...image, url: event.target.value })}
-              type="url"
-              value={image.url}
-            />
-          </div>
-          <MediaPickerButton
-            onSelect={(file) =>
-              onChange({
-                ...image,
-                alt: image.alt || file.filename,
-                url: file.mediaUrl ?? file.url,
-              })
-            }
-          />
-        </div>
-      </FormControl>
-      <FormField label="Alt Text">
-        <input
-          className={inputClassName}
-          name="imageAlt"
-          onChange={(event) => onChange({ ...image, alt: event.target.value })}
-          type="text"
-          value={image.alt}
-        />
-      </FormField>
-      <div className="flex flex-wrap gap-2">
-        <label className="inline-flex min-h-11 items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 shadow-sm shadow-black/5">
-          <input
-            checked={image.isPrimary}
-            className="h-4 w-4 accent-zinc-950"
-            name="primaryImageIndex"
-            onChange={onMakePrimary}
-            type="radio"
-            value={index}
-          />
-          Primary
-        </label>
+    <section
+      className={cn(
+        "scroll-mt-24 rounded-lg border border-zinc-200 bg-white shadow-sm shadow-black/5",
+        className,
+      )}
+      id={`product-form-${id}`}
+    >
+      <h2 className="border-b border-zinc-200 px-4 py-3 text-lg font-black text-zinc-950 sm:px-5">
+        {title}
+      </h2>
+      <div className="grid gap-4 p-4 sm:p-5">{children}</div>
+    </section>
+  );
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <span className="text-sm font-black text-zinc-950 lg:py-3">{children}</span>
+  );
+}
+
+function CurrencyInput({
+  defaultValue,
+  name,
+  required = false,
+}: {
+  defaultValue: string;
+  name: string;
+  required?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-[2.25rem_minmax(0,1fr)] overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm shadow-black/5 focus-within:border-zinc-950 focus-within:ring-2 focus-within:ring-zinc-950/10">
+      <span className="flex min-h-11 items-center justify-center border-r border-zinc-200 bg-zinc-50 text-sm font-black text-zinc-700">
+        Tk
+      </span>
+      <input
+        className="min-h-11 w-full bg-white px-3 text-sm font-medium text-zinc-950 outline-none"
+        defaultValue={defaultValue}
+        min="0"
+        name={name}
+        required={required}
+        step="0.01"
+        type="number"
+      />
+    </div>
+  );
+}
+
+function ToggleRow({
+  checked,
+  disabled = false,
+  helperText,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  helperText?: string;
+  label: string;
+  onChange?: (checked: boolean) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      <label
+        className={cn(
+          "flex items-center justify-between gap-3 text-sm font-semibold text-zinc-950",
+          disabled && "text-zinc-400",
+        )}
+      >
+        <span>{label}</span>
         <button
-          aria-label="Remove image"
-          className={dangerIconButtonClassName}
-          onClick={onRemove}
+          aria-checked={checked}
+          className={cn(
+            "relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition",
+            checked ? "bg-zinc-950" : "bg-zinc-300",
+            disabled && "cursor-not-allowed opacity-70",
+          )}
+          disabled={disabled}
+          onClick={() => onChange?.(!checked)}
+          role="switch"
           type="button"
         >
-          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          <span
+            className={cn(
+              "h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+              checked ? "translate-x-5" : "translate-x-0.5",
+            )}
+          />
         </button>
+      </label>
+      {helperText ? (
+        <p className="text-xs font-semibold text-zinc-400">{helperText}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ProductDescriptionPanel({
+  description,
+}: {
+  description: string;
+}) {
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
+        <FieldLabel>Description</FieldLabel>
+        <div className="overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm shadow-black/5 focus-within:border-zinc-950 focus-within:ring-2 focus-within:ring-zinc-950/10">
+          <div
+            aria-hidden="true"
+            className="flex min-h-12 flex-wrap items-center gap-1 border-b border-zinc-200 bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-500"
+          >
+            {["B", "I", "U"].map((label) => (
+              <span
+                className="inline-flex h-7 min-w-7 items-center justify-center rounded border border-transparent px-2 text-zinc-600"
+                key={label}
+              >
+                {label}
+              </span>
+            ))}
+            <span className="h-5 w-px bg-zinc-300" />
+            {["Left", "Center", "Right", "Justify"].map((label) => (
+              <span
+                className="inline-flex h-7 items-center rounded border border-transparent px-2"
+                key={label}
+              >
+                {label}
+              </span>
+            ))}
+            <span className="h-5 w-px bg-zinc-300" />
+            {["List", "Order"].map((label) => (
+              <span
+                className="inline-flex h-7 items-center rounded border border-transparent px-2"
+                key={label}
+              >
+                {label}
+              </span>
+            ))}
+            {["Font Size...", "Font Family...", "Font Format"].map((label) => (
+              <span
+                className="inline-flex h-7 min-w-24 items-center justify-between rounded border border-zinc-300 bg-white px-2 text-zinc-500"
+                key={label}
+              >
+                {label}
+                <span className="ml-2 text-[10px]">v</span>
+              </span>
+            ))}
+            {["Link", "Image", "Table"].map((label) => (
+              <span
+                className="inline-flex h-7 items-center rounded border border-transparent px-2"
+                key={label}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+          <textarea
+            className="min-h-36 w-full resize-y border-0 bg-white px-3 py-3 text-sm font-medium leading-6 text-zinc-950 outline-none"
+            defaultValue={description}
+            name="description"
+            placeholder="Write product details, material notes, fit guidance, and care instructions."
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
+        <FieldLabel>Summary</FieldLabel>
+        <textarea
+          className={cn(inputClassName, "min-h-28 resize-y py-3")}
+          disabled
+          placeholder="Summary support is coming soon."
+        />
       </div>
     </div>
   );
 }
 
-function ImagePreview({ image }: { image: ProductFormImage }) {
+function SeoContentPanel({
+  seoDescription,
+  seoTitle,
+}: {
+  seoDescription: string;
+  seoTitle: string;
+}) {
   return (
-    <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-white text-zinc-400 sm:h-11 sm:w-20">
-      {image.url ? (
-        <Image
-          alt={image.alt || "Selected product image"}
-          className="h-full w-full object-cover"
-          height={80}
-          src={image.url}
-          unoptimized
-          width={80}
+    <div className="grid gap-5">
+      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-center">
+        <FieldLabel>Meta Title</FieldLabel>
+        <input
+          className={inputClassName}
+          defaultValue={seoTitle}
+          name="seoTitle"
+          type="text"
         />
-      ) : (
-        <ImageOff className="h-5 w-5" aria-hidden="true" />
-      )}
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
+        <FieldLabel>Meta Description</FieldLabel>
+        <textarea
+          className={cn(inputClassName, "min-h-32 resize-y py-3")}
+          defaultValue={seoDescription}
+          name="seoDescription"
+        />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-start">
+        <FieldLabel>Meta Keywords</FieldLabel>
+        <div className="grid gap-1.5">
+          <input className={inputClassName} type="text" />
+          <p className="text-sm font-medium text-zinc-500">
+            Type , as separator or hit enter among keywords
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MediaContentsPanel({
+  images,
+  onImagesChange,
+}: {
+  images: ProductFormImage[];
+  onImagesChange: Dispatch<SetStateAction<ProductFormImage[]>>;
+}) {
+  const primaryImageIndex = Math.max(
+    images.findIndex((image) => image.isPrimary),
+    0,
+  );
+  const primaryImage = images[primaryImageIndex] ?? createBlankImage(true);
+  const galleryImages = images
+    .map((image, index) => ({ image, index }))
+    .filter(({ index }) => index !== primaryImageIndex);
+
+  function updateImage(imageKey: string, nextImage: ProductFormImage) {
+    onImagesChange((current) =>
+      current.map((image) => (image.key === imageKey ? nextImage : image)),
+    );
+  }
+
+  function selectMainImage(file: MediaPickerItem) {
+    updateImage(primaryImage.key, {
+      ...primaryImage,
+      alt: primaryImage.alt || file.filename,
+      isPrimary: true,
+      url: file.mediaUrl ?? file.url,
+    });
+  }
+
+  function addGalleryImage(file: MediaPickerItem) {
+    onImagesChange((current) => [
+      ...current,
+      {
+        ...createBlankImage(current.length === 0),
+        alt: file.filename,
+        isPrimary: current.length === 0,
+        url: file.mediaUrl ?? file.url,
+      },
+    ]);
+  }
+
+  function addBlankGalleryImage() {
+    onImagesChange((current) => [
+      ...current,
+      createBlankImage(current.length === 0),
+    ]);
+  }
+
+  function makePrimary(imageKey: string) {
+    onImagesChange((current) =>
+      current.map((image) => ({
+        ...image,
+        isPrimary: image.key === imageKey,
+      })),
+    );
+  }
+
+  return (
+    <div className="grid gap-5">
+      <input name="primaryImageIndex" type="hidden" value={primaryImageIndex} />
+      {images.map((image) => (
+        <div hidden key={image.key}>
+          <input name="imageUrl" readOnly type="hidden" value={image.url} />
+          <input name="imageAlt" readOnly type="hidden" value={image.alt} />
+        </div>
+      ))}
+
+      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
+        <FieldLabel>Main Image</FieldLabel>
+        <div className="grid gap-3">
+          <div className="relative flex aspect-square w-full max-w-[13rem] items-center justify-center overflow-hidden rounded-lg border border-dashed border-zinc-200 bg-white text-zinc-300">
+            {primaryImage.url ? (
+              <Image
+                alt={primaryImage.alt || "Selected main product image"}
+                className="h-full w-full object-cover"
+                height={240}
+                src={primaryImage.url}
+                unoptimized
+                width={240}
+              />
+            ) : (
+              <ImageIcon className="h-16 w-16 stroke-[1.4]" aria-hidden="true" />
+            )}
+            <MediaPickerButton
+              ariaLabel="Choose main product image"
+              className="absolute bottom-2 right-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-white shadow-lg shadow-black/20 transition hover:bg-slate-800"
+              onSelect={selectMainImage}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </MediaPickerButton>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              aria-label="Main image URL"
+              className={inputClassName}
+              onChange={(event) =>
+                updateImage(primaryImage.key, {
+                  ...primaryImage,
+                  url: event.target.value,
+                })
+              }
+              placeholder="Main image URL"
+              type="url"
+              value={primaryImage.url}
+            />
+            <input
+              aria-label="Main image alt text"
+              className={inputClassName}
+              onChange={(event) =>
+                updateImage(primaryImage.key, {
+                  ...primaryImage,
+                  alt: event.target.value,
+                })
+              }
+              placeholder="Alt text"
+              type="text"
+              value={primaryImage.alt}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
+        <FieldLabel>Gallery Images</FieldLabel>
+        <div className="grid gap-3">
+          <div className="min-h-32 rounded-lg border border-dashed border-zinc-200 bg-white p-4">
+            <div className="flex flex-wrap gap-3">
+              <MediaPickerButton
+                ariaLabel="Upload gallery image"
+                className="flex h-24 w-24 flex-col items-center justify-center gap-2 rounded-md border border-zinc-200 bg-zinc-100 text-sm font-semibold text-zinc-500 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-800"
+                onSelect={addGalleryImage}
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Upload
+              </MediaPickerButton>
+
+              {galleryImages.map(({ image, index }) => (
+                <div className="grid w-28 gap-2" key={image.key}>
+                  <div className="relative aspect-square overflow-hidden rounded-md border border-zinc-200 bg-zinc-50">
+                    {image.url ? (
+                      <Image
+                        alt={image.alt || "Gallery product image"}
+                        className="h-full w-full object-cover"
+                        height={112}
+                        src={image.url}
+                        unoptimized
+                        width={112}
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-zinc-300">
+                        <ImageIcon
+                          className="h-8 w-8 stroke-[1.4]"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      className="min-h-8 flex-1 rounded-md border border-zinc-200 bg-white px-2 text-xs font-semibold text-zinc-600 shadow-sm shadow-black/5 transition hover:text-zinc-950"
+                      onClick={() => makePrimary(image.key)}
+                      type="button"
+                    >
+                      Main
+                    </button>
+                    <button
+                      aria-label={`Remove gallery image ${index + 1}`}
+                      className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-red-200 bg-white text-red-700 shadow-sm shadow-black/5 transition hover:bg-red-50"
+                      onClick={() =>
+                        onImagesChange((current) =>
+                          removeImageRow(current, image.key),
+                        )
+                      }
+                      type="button"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {galleryImages.length ? (
+            <div className="grid gap-3">
+              {galleryImages.map(({ image }, displayIndex) => (
+                <div
+                  className="grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-2"
+                  key={image.key}
+                >
+                  <input
+                    aria-label={`Gallery image ${displayIndex + 1} URL`}
+                    className={inputClassName}
+                    onChange={(event) =>
+                      updateImage(image.key, {
+                        ...image,
+                        url: event.target.value,
+                      })
+                    }
+                    placeholder="Gallery image URL"
+                    type="url"
+                    value={image.url}
+                  />
+                  <input
+                    aria-label={`Gallery image ${displayIndex + 1} alt text`}
+                    className={inputClassName}
+                    onChange={(event) =>
+                      updateImage(image.key, {
+                        ...image,
+                        alt: event.target.value,
+                      })
+                    }
+                    placeholder="Alt text"
+                    type="text"
+                    value={image.alt}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <button
+            className={secondaryButtonClassName}
+            onClick={addBlankGalleryImage}
+            type="button"
+          >
+            <ImagePlus className="h-4 w-4" aria-hidden="true" />
+            Add image URL
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
+        <FieldLabel>Video</FieldLabel>
+        <div className="grid gap-1.5">
+          <input
+            className={inputClassName}
+            placeholder="https://www.youtube.com/embed/..."
+            type="url"
+          />
+          <p className="text-sm font-medium text-zinc-500">
+            Only youtube embed link is allowed
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
 
 function MediaPickerButton({
+  ariaLabel,
+  children,
+  className,
   onSelect,
 }: {
+  ariaLabel?: string;
+  children?: ReactNode;
+  className?: string;
   onSelect: (file: MediaPickerItem) => void;
 }) {
   const [error, setError] = useState("");
@@ -544,9 +1077,17 @@ function MediaPickerButton({
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button className={secondaryButtonClassName} type="button">
-          <Images className="h-4 w-4" aria-hidden="true" />
-          Choose From Media Library
+        <button
+          aria-label={ariaLabel}
+          className={className ?? secondaryButtonClassName}
+          type="button"
+        >
+          {children ?? (
+            <>
+              <Images className="h-4 w-4" aria-hidden="true" />
+              Choose From Media Library
+            </>
+          )}
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -855,33 +1396,6 @@ function VariantRow({
   );
 }
 
-function FormSection({
-  children,
-  description,
-  icon: Icon,
-  title,
-}: {
-  children: ReactNode;
-  description: string;
-  icon: typeof PackagePlus;
-  title: string;
-}) {
-  return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm shadow-black/5 sm:p-5">
-      <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-sky-50 text-sky-700">
-          <Icon className="h-5 w-5" aria-hidden="true" />
-        </div>
-        <div className="min-w-0">
-          <h2 className="text-lg font-black text-zinc-950">{title}</h2>
-          <p className="text-sm leading-6 text-zinc-500">{description}</p>
-        </div>
-      </div>
-      <div className="grid gap-4">{children}</div>
-    </section>
-  );
-}
-
 function FormField({
   children,
   label,
@@ -896,23 +1410,6 @@ function FormField({
       </span>
       {children}
     </label>
-  );
-}
-
-function FormControl({
-  children,
-  label,
-}: {
-  children: ReactNode;
-  label: string;
-}) {
-  return (
-    <div className="grid gap-2">
-      <span className="text-xs font-semibold uppercase text-zinc-500">
-        {label}
-      </span>
-      {children}
-    </div>
   );
 }
 
@@ -1014,6 +1511,3 @@ const inputClassName =
 
 const secondaryButtonClassName =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm shadow-black/5 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 sm:w-fit";
-
-const dangerIconButtonClassName =
-  "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-red-200 bg-white text-red-700 shadow-sm shadow-black/5 transition hover:border-red-300 hover:bg-red-50";

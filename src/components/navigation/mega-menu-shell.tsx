@@ -4,20 +4,23 @@ import { AnimatePresence, motion } from "framer-motion";
 import { siteContainerClassName } from "@/lib/constants/layout";
 import { findNavigationItemByMenuKey } from "@/lib/constants/navigation";
 import { cn } from "@/lib/utils";
+import type { NavItem } from "@/types/navigation";
 
 type MegaMenuShellProps = {
   activeMenuKey: string | null;
+  navigation?: NavItem[];
   onMouseEnter?: MouseEventHandler<HTMLDivElement>;
   onMouseLeave?: MouseEventHandler<HTMLDivElement>;
 };
 
 export function MegaMenuShell({
   activeMenuKey,
+  navigation,
   onMouseEnter,
   onMouseLeave,
 }: MegaMenuShellProps) {
   const activeItem = activeMenuKey
-    ? findNavigationItemByMenuKey(activeMenuKey)
+    ? findNavigationItemByMenuKey(activeMenuKey, navigation)
     : null;
 
   return (

@@ -25,6 +25,9 @@ export function ProductGallery({
         <div
           key={`${image}-${index}`}
           className="relative aspect-[4/5] overflow-hidden rounded-md bg-muted"
+          data-cart-animation-source={
+            index === 0 ? "desktop-product-detail" : undefined
+          }
         >
           <Image
             src={getImageUrl(image, defaultImagePlaceholders.product)}

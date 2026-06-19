@@ -1,11 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { useFlyToCartAnimation } from "@/hooks/use-fly-to-cart-animation";
 import {
   findPurchasableVariant,
   getVariantAvailability,
 } from "@/lib/inventory";
+import {
+  defaultImagePlaceholders,
+  getImageUrl,
+} from "@/lib/constants/assets";
 import { useCartStore } from "@/store/cart-store";
 import type { Product } from "@/types/product";
 import { ColorSelector } from "./color-selector";
@@ -17,6 +22,7 @@ type ProductPurchasePanelProps = {
 
 export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
   const addItem = useCartStore((state) => state.addItem);
+  const { flyToCart } = useFlyToCartAnimation();
   const firstAvailableVariant = findPurchasableVariant(product);
   const [color, setColor] = useState(
     firstAvailableVariant?.color ?? product.colors[0]?.name,
@@ -34,13 +40,26 @@ export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
     ? getVariantAvailability(selectedVariant)
     : undefined;
   const canPurchase = Boolean(selectedAvailability?.purchasable);
+  const productImageSrc = getImageUrl(
+    product.images[0],
+    defaultImagePlaceholders.product,
+  );
 
-  function handleAddToCart() {
+  function handleAddToCart(event: MouseEvent<HTMLButtonElement>) {
     if (!canPurchase) {
       setStatus("Please select an available color and size.");
       return;
     }
 
+    const sourceElement =
+      document.querySelector<HTMLElement>(
+        '[data-cart-animation-source="desktop-product-detail"]',
+      ) ?? event.currentTarget;
+
+    flyToCart({
+      imageSrc: productImageSrc,
+      sourceElement,
+    });
     addItem(product, selectedVariant?.id);
     setStatus(
       selectedAvailability?.isPreorder

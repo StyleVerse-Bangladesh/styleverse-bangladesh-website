@@ -268,7 +268,7 @@ function PrivacyDocument({
 
 export default function PrivacyPolicyPage() {
   return (
-    <main className="bg-white">
+    <main className="bg-white md:bg-transparent">
       <div className={legalContainerClassName}>
         <div className="space-y-16 sm:space-y-20">
           <PrivacyDocument

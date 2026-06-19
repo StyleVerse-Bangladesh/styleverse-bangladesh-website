@@ -79,7 +79,7 @@ async function getMediaFiles(filters: MediaAdminFilters) {
         sizeLabel: formatFileSize(file.sizeBytes),
         sourceLabel: preview.sourceLabel,
         uploadedAt: formatDate(file.uploadedAt),
-        url: file.url,
+        url: preview.mediaUrl ?? file.url,
         warning: preview.warning,
       };
     }),

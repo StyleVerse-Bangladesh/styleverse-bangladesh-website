@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  buildCloudinaryDeliveryUrl,
   destroyCloudinaryImage,
   getCloudinaryConfig,
   uploadProductImageToCloudinary,
@@ -9,7 +10,6 @@ import {
 import { db } from "@/lib/db";
 
 export type MediaActionState = {
-  error?: string;
   message?: string;
   ok?: boolean;
 };
@@ -58,10 +58,29 @@ export async function uploadMediaAction(
     }
 
     if (!getCloudinaryConfig()) {
-      return errorState("Cloudinary is not configured. Check the media upload environment variables.");
+      return errorState(
+        "Cloudinary configuration is missing. Check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.",
+      );
     }
 
-    const upload = await uploadProductImageToCloudinary({ buffer: bytes });
+    const upload = await uploadProductImageToCloudinary({ buffer: bytes }).catch(
+      (error: unknown) => {
+        console.error("Cloudinary media upload failed:", error);
+        return null;
+      },
+    );
+
+    if (!upload) {
+      return errorState("Upload failed while sending the image to Cloudinary.");
+    }
+
+    const publicId = upload.publicId;
+    const secureUrl = upload.secureUrl;
+    const deliveryUrl = resolveUploadDeliveryUrl({
+      deliveryUrl: upload.deliveryUrl,
+      publicId,
+      secureUrl,
+    });
 
     try {
       await db.mediaFile.create({
@@ -77,13 +96,13 @@ export async function uploadMediaAction(
           originalFormat: mediaType.extension,
           originalHeight: upload.height,
           originalWidth: upload.width,
-          publicId: upload.publicId,
-          secureUrl: upload.secureUrl,
+          publicId,
+          secureUrl,
           sizeBytes: upload.bytes,
-          storagePath: upload.publicId,
+          storagePath: publicId,
           storageProvider: "cloudinary",
-          storedFilename: `${upload.publicId.split("/").pop() ?? upload.publicId}.webp`,
-          url: upload.deliveryUrl,
+          storedFilename: `${publicId.split("/").pop() ?? publicId}.webp`,
+          url: deliveryUrl,
           width: upload.width,
         },
       });
@@ -171,6 +190,42 @@ export async function deleteMediaAction(
   }
 }
 
+function resolveUploadDeliveryUrl({
+  deliveryUrl,
+  publicId,
+  secureUrl,
+}: {
+  deliveryUrl: string;
+  publicId: string;
+  secureUrl: string;
+}) {
+  const fallbackUrl = secureUrl.trim();
+
+  if (!fallbackUrl) {
+    throw new Error("Cloudinary upload returned no secure URL.");
+  }
+
+  try {
+    const generatedUrl = buildCloudinaryDeliveryUrl(publicId);
+
+    if (isUsableCloudinaryUrl(generatedUrl)) {
+      return generatedUrl;
+    }
+  } catch {
+    // Fall back below to Cloudinary's directly returned secure URL.
+  }
+
+  if (isUsableCloudinaryUrl(deliveryUrl)) {
+    return deliveryUrl;
+  }
+
+  return fallbackUrl;
+}
+
+function isUsableCloudinaryUrl(value: string) {
+  return Boolean(value.trim()) && !value.includes(`fl_${"strip"}`);
+}
+
 function isUploadFile(value: FormDataEntryValue | null): value is File {
   return (
     typeof value === "object" &&
@@ -248,9 +303,9 @@ function successState(message: string): MediaActionState {
   };
 }
 
-function errorState(error: string): MediaActionState {
+function errorState(message: string): MediaActionState {
   return {
-    error,
+    message,
     ok: false,
   };
 }

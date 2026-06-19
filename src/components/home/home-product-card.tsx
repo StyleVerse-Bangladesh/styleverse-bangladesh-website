@@ -73,6 +73,7 @@ export function HomeProductCard({
     Boolean(productAvailability?.purchasable);
   const [showAddedState, setShowAddedState] = useState(false);
   const addedStateTimerRef = useRef<number | null>(null);
+  const productImageRef = useRef<HTMLImageElement | null>(null);
   const isWishlisted = useWishlistStore((state) =>
     wishlistProductId ? state.isWishlisted(wishlistProductId) : false,
   );
@@ -91,7 +92,7 @@ export function HomeProductCard({
     event.stopPropagation();
 
     if (wishlistProductId) {
-      toggleWishlist(wishlistProductId);
+      toggleWishlist(wishlistProductId, cartProduct);
     }
   }
 
@@ -103,11 +104,11 @@ export function HomeProductCard({
       return;
     }
 
-    addItem(cartProduct, firstAvailableVariant?.id);
     flyToCart({
       imageSrc: product.image,
-      sourceElement: event.currentTarget,
+      sourceElement: productImageRef.current ?? event.currentTarget,
     });
+    addItem(cartProduct, firstAvailableVariant?.id);
     setShowAddedState(true);
 
     if (addedStateTimerRef.current !== null) {
@@ -136,6 +137,7 @@ export function HomeProductCard({
       />
       <div className="relative aspect-square overflow-hidden bg-zinc-100">
         <Image
+          ref={productImageRef}
           src={product.image}
           alt={product.name}
           fill
